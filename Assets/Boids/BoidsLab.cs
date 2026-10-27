@@ -6,14 +6,25 @@ using System.Collections.Generic;
 // placed under an AR image target without changing the flocking algorithm.
 public class BoidsLab : MonoBehaviour
 {
-    const int Count = 70;
+    const int Count = 200;
     const float Radius = 3.8f;
+    const int GroupCount = 2;
+    const float GroupSpacing = 12f; // Distance between the two flock centres
     const float Perception = 1.45f;
     const float PersonalSpace = 0.55f;
-    const float MaxSpeed = 1.7f;
+    const float MaxSpeed = 3.7f;
     const float MaxForce = 2.2f;
 
+    [Header("Terrain Avoidance")]
+    public Terrain terrain;
+    public float minimumHeight = 3f;
+    public float terrainAvoidanceWeight = 5f;
+
+    [Header("Ground Collision")]
+    public LayerMask groundLayer;
+
     Vector3[] positions, velocities, separation, alignment, cohesion;
+    readonly Vector3[] groupCentres = new Vector3[GroupCount];
     Transform[] birds;
     LineRenderer[] neighbourLines;
     LineRenderer separationLine, alignmentLine, cohesionLine;
@@ -23,7 +34,7 @@ public class BoidsLab : MonoBehaviour
     Transform root;
     Mesh birdMesh;
     float separationWeight = 1.5f, alignmentWeight = 1f, cohesionWeight = 1f;
-    float yaw = 25f, pitch = 22f, distance = 12f;
+    float yaw = 25f, pitch = 22f, distance = 21f;
     bool playing = true, inspect = true, stepRequested;
     int selected;
     Vector2 panelScroll;
@@ -109,15 +120,37 @@ public class BoidsLab : MonoBehaviour
         return line;
     }
 
+    int GroupOf(int birdIndex)
+    {
+        // First 35 boids belong to group 0; last 35 belong to group 1.
+        return birdIndex < Count / 2 ? 0 : 1;
+    }
+
     void ResetFlock()
     {
-        // Repeatable starting state makes rule comparisons easier.
+        // Keep both groups near independent centres in local coordinates.
+        // Place centres above the forest terrain, when a Terrain is assigned.
+        for (int group = 0; group < GroupCount; group++)
+        {
+            float x = (group == 0 ? -0.5f : 0.5f) * GroupSpacing;
+            Vector3 centre = new Vector3(x, 5f, 0f);
+            if (terrain != null)
+            {
+                Vector3 worldCentre = root.TransformPoint(centre);
+                float terrainY = terrain.SampleHeight(worldCentre) + terrain.transform.position.y;
+                worldCentre.y = terrainY + minimumHeight + 3f;
+                centre = root.InverseTransformPoint(worldCentre);
+            }
+            groupCentres[group] = centre;
+        }
+
         Random.State previous = Random.state;
-        Random.InitState(16);
+        Random.InitState(16); // Repeatable starting state
         for (int i = 0; i < Count; i++)
         {
-            positions[i] = Random.insideUnitSphere * 2.8f;
+            positions[i] = groupCentres[GroupOf(i)] + Random.insideUnitSphere * 1.1f;
             velocities[i] = Random.onUnitSphere * MaxSpeed * 0.7f;
+            KeepAboveGround(i);
         }
         Random.state = previous;
     }
@@ -126,6 +159,70 @@ public class BoidsLab : MonoBehaviour
     {
         if (desired.sqrMagnitude < 0.000001f) return Vector3.zero;
         return Vector3.ClampMagnitude(desired.normalized * MaxSpeed - velocity, MaxForce);
+    }
+
+    void KeepAboveGround(int i)
+{
+    Vector3 worldPosition = root.TransformPoint(positions[i]);
+
+        // Start above the bird so we can also detect ground
+        // when the bird is already below the surface.
+        Vector3 rayOrigin = worldPosition + Vector3.up * 100f;
+
+        if (Physics.Raycast(
+            rayOrigin,
+            Vector3.down,
+            out RaycastHit hit,
+            200f,
+            groundLayer,
+            QueryTriggerInteraction.Ignore))
+        {
+            float minimumY = hit.point.y + minimumHeight;
+
+            if (worldPosition.y < minimumY)
+            {
+                worldPosition.y = minimumY;
+
+                positions[i] = root.InverseTransformPoint(worldPosition);
+
+                // Prevent the bird from continuing downward.
+                Vector3 worldVelocity =
+                    root.TransformDirection(velocities[i]);
+
+                if (worldVelocity.y < 0f)
+                {
+                    worldVelocity.y = 0f;
+                    velocities[i] =
+                        root.InverseTransformDirection(worldVelocity);
+                }
+            }
+        }
+    }
+
+    Vector3 TerrainAvoidance(Vector3 localPosition, Vector3 localVelocity)
+    {
+        if (terrain == null)
+            return Vector3.zero;
+
+        // Convert local boid position to world coordinates
+        Vector3 worldPosition = root.TransformPoint(localPosition);
+
+        // Find the ground height at the boid's position
+        float groundHeight =
+            terrain.SampleHeight(worldPosition)
+            + terrain.transform.position.y;
+
+        float desiredHeight = groundHeight + minimumHeight;
+
+        // No avoidance needed when safely above ground
+        if (worldPosition.y >= desiredHeight)
+            return Vector3.zero;
+
+        // Steer upward in world space, then convert to local space
+        Vector3 worldUp = Vector3.up;
+        Vector3 localUp = root.InverseTransformDirection(worldUp);
+
+        return Steer(localUp, localVelocity);
     }
 
     void CalculateForces()
@@ -138,7 +235,7 @@ public class BoidsLab : MonoBehaviour
             int nearby = 0, close = 0;
             for (int j = 0; j < Count; j++)
             {
-                if (j == i) continue;
+                if (j == i || GroupOf(i) != GroupOf(j)) continue;
                 Vector3 delta = positions[i] - positions[j];
                 float squared = delta.sqrMagnitude;
                 if (squared > Perception * Perception) continue;
@@ -168,12 +265,18 @@ public class BoidsLab : MonoBehaviour
             for (int i = 0; i < Count; i++)
             {
                 Vector3 force = separation[i] * separationWeight
-                    + alignment[i] * alignmentWeight + cohesion[i] * cohesionWeight;
-                // Separate containment behaviour keeps the demonstration in view.
-                float excess = positions[i].magnitude - Radius;
-                if (excess > 0) force -= positions[i].normalized * excess * 3f;
+                    + alignment[i] * alignmentWeight
+                    + cohesion[i] * cohesionWeight
+                    + TerrainAvoidance(positions[i], velocities[i])
+                        * terrainAvoidanceWeight;
+                // Keep each group near its OWN centre, not one shared centre.
+                Vector3 fromGroupCentre = positions[i] - groupCentres[GroupOf(i)];
+                float excess = fromGroupCentre.magnitude - Radius;
+                if (excess > 0)
+                    force -= fromGroupCentre.normalized * excess * 3f;
                 velocities[i] = Vector3.ClampMagnitude(velocities[i] + force * dt, MaxSpeed);
                 positions[i] += velocities[i] * dt;
+                KeepAboveGround(i);
             }
             CalculateForces();
         }
@@ -183,7 +286,8 @@ public class BoidsLab : MonoBehaviour
             if (velocities[i].sqrMagnitude > 0.000001f)
                 birds[i].localRotation = Quaternion.LookRotation(velocities[i]);
             birds[i].GetComponent<MeshRenderer>().sharedMaterial = i == selected ? selectedMaterial : birdMaterial;
-            bool neighbour = i != selected && (positions[i] - positions[selected]).sqrMagnitude < Perception * Perception;
+            bool neighbour = i != selected && GroupOf(i) == GroupOf(selected)
+                && (positions[i] - positions[selected]).sqrMagnitude < Perception * Perception;
             neighbourLines[i].enabled = inspect && neighbour;
             if (inspect && neighbour) SetLine(neighbourLines[i], positions[selected], positions[i]);
         }
@@ -228,7 +332,7 @@ public class BoidsLab : MonoBehaviour
         GUILayout.BeginArea(panel, GUI.skin.box);
         panelScroll = GUILayout.BeginScrollView(panelScroll);
         GUILayout.Label("BOIDS LEARNING LAB");
-        GUILayout.Label("How do local rules produce a flock?");
+        GUILayout.Label("How do local rules produce two flocks?");
         GUILayout.Space(10);
         separationWeight = RuleSlider("Separation (red)", "Avoid crowding close neighbours.", separationWeight);
         alignmentWeight = RuleSlider("Alignment (green)", "Match nearby boids' direction.", alignmentWeight);
@@ -253,7 +357,7 @@ public class BoidsLab : MonoBehaviour
         GUILayout.Label("1. Predict what happens without cohesion.\n2. Set cohesion to 0 and reset the flock.\n3. Restore it and compare the motion.");
         GUILayout.Space(12);
         GUILayout.Label("VIEW: drag in the scene to orbit; scroll to zoom.");
-        GUILayout.Label("A separate inward steering force keeps the flock near the centre. It is not one of the three flocking rules.");
+        GUILayout.Label("Two independent groups (35 boids each). Each group has its own boundary and local neighbours. They do not merge.");
         GUILayout.Label("Desktop prototype: AR tracking is not included yet.");
         GUILayout.EndScrollView();
         GUILayout.EndArea();
