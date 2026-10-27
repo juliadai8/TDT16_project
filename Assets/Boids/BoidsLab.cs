@@ -6,25 +6,28 @@ using System.Collections.Generic;
 // placed under an AR image target without changing the flocking algorithm.
 public class BoidsLab : MonoBehaviour
 {
-    const int Count = 200;
-    const float Radius = 3.8f;
-    const int GroupCount = 2;
-    const float GroupSpacing = 12f; // Distance between the two flock centres
-    const float Perception = 1.45f;
-    const float PersonalSpace = 0.55f;
-    const float MaxSpeed = 3.7f;
-    const float MaxForce = 2.2f;
+    const int Count = 400;
+    const float Perception = 2.0f;
+    const float PersonalSpace = 0.7f;
+    const float MaxSpeed = 5.0f;
+    const float MaxForce = 3.0f;
 
     [Header("Terrain Avoidance")]
     public Terrain terrain;
     public float minimumHeight = 3f;
+    public float maximumHeight = 12f;
     public float terrainAvoidanceWeight = 5f;
+
+    [Header("Flight Area")]
+    [Min(4f)] public float flightAreaRadius = 50f;
+    [Min(1f)] public float boundaryTurnDistance = 6f;
+    [Min(0f)] public float boundaryStrength = 5f;
 
     [Header("Ground Collision")]
     public LayerMask groundLayer;
 
     Vector3[] positions, velocities, separation, alignment, cohesion;
-    readonly Vector3[] groupCentres = new Vector3[GroupCount];
+    Vector3 habitatCentre; // World-space starting area; not a flock attractor.
     Transform[] birds;
     LineRenderer[] neighbourLines;
     LineRenderer separationLine, alignmentLine, cohesionLine;
@@ -34,8 +37,8 @@ public class BoidsLab : MonoBehaviour
     Transform root;
     Mesh birdMesh;
     float separationWeight = 1.5f, alignmentWeight = 1f, cohesionWeight = 1f;
-    float yaw = 25f, pitch = 22f, distance = 21f;
-    bool playing = true, inspect = true, stepRequested;
+    float yaw = 25f, pitch = 22f, distance = 19f;
+    bool playing = true, inspect = false, stepRequested;
     int selected;
     Vector2 panelScroll;
 
@@ -120,39 +123,87 @@ public class BoidsLab : MonoBehaviour
         return line;
     }
 
-    int GroupOf(int birdIndex)
-    {
-        // First 35 boids belong to group 0; last 35 belong to group 1.
-        return birdIndex < Count / 2 ? 0 : 1;
-    }
-
     void ResetFlock()
     {
-        // Keep both groups near independent centres in local coordinates.
-        // Place centres above the forest terrain, when a Terrain is assigned.
-        for (int group = 0; group < GroupCount; group++)
-        {
-            float x = (group == 0 ? -0.5f : 0.5f) * GroupSpacing;
-            Vector3 centre = new Vector3(x, 5f, 0f);
-            if (terrain != null)
-            {
-                Vector3 worldCentre = root.TransformPoint(centre);
-                float terrainY = terrain.SampleHeight(worldCentre) + terrain.transform.position.y;
-                worldCentre.y = terrainY + minimumHeight + 3f;
-                centre = root.InverseTransformPoint(worldCentre);
-            }
-            groupCentres[group] = centre;
-        }
+        // No predefined groups. All birds begin scattered with independent headings.
+        // Pick a point near the middle of the assigned terrain, safely inside its bounds.
+        habitatCentre = terrain != null
+            ? terrain.transform.position + new Vector3(
+                terrain.terrainData.size.x * 0.5f, 0f,
+                terrain.terrainData.size.z * 0.5f)
+            : transform.position;
 
         Random.State previous = Random.state;
-        Random.InitState(16); // Repeatable starting state
+        Random.InitState(16);
         for (int i = 0; i < Count; i++)
         {
-            positions[i] = groupCentres[GroupOf(i)] + Random.insideUnitSphere * 1.1f;
-            velocities[i] = Random.onUnitSphere * MaxSpeed * 0.7f;
+            Vector2 offset = Random.insideUnitCircle * Mathf.Min(5f, GetFlightRadius() * 0.5f);
+            Vector3 worldPos = habitatCentre + new Vector3(offset.x, 0f, offset.y);
+            float groundY = terrain != null
+                ? terrain.SampleHeight(worldPos) + terrain.transform.position.y
+                : transform.position.y;
+            worldPos.y = groundY + minimumHeight + Random.Range(3f, 9f);
+            positions[i] = root.InverseTransformPoint(worldPos);
+            velocities[i] = root.InverseTransformDirection(Random.onUnitSphere * MaxSpeed * 0.7f);
             KeepAboveGround(i);
+            KeepBelowCeiling(i);
         }
         Random.state = previous;
+    }
+
+    // Radius is measured horizontally around the centre of the forest.
+    // Keep the circle within the Terrain bounds so that height sampling works.
+    float GetFlightRadius()
+    {
+        float radius = Mathf.Max(4f, flightAreaRadius);
+        if (terrain == null) return radius;
+        Vector3 size = terrain.terrainData.size;
+        return Mathf.Max(1f, Mathf.Min(radius,
+            Mathf.Min(size.x, size.z) * 0.5f - 3f));
+    }
+
+    // Only turns birds inward as they APPROACH the outer edge.
+    // There is no attraction to the centre in the interior.
+    Vector3 HabitatAvoidance(Vector3 localPosition, Vector3 localVelocity)
+    {
+        Vector3 world = root.TransformPoint(localPosition);
+        Vector3 offset = world - habitatCentre;
+        offset.y = 0f;
+        float radius = GetFlightRadius();
+        float turnDistance = Mathf.Min(boundaryTurnDistance, radius * 0.5f);
+        float startTurning = radius - turnDistance;
+        float distanceFromCentre = offset.magnitude;
+        if (distanceFromCentre < startTurning || distanceFromCentre < 0.0001f)
+            return Vector3.zero;
+
+        Vector3 inward = -offset.normalized;
+        float amount = Mathf.Clamp01((distanceFromCentre - startTurning) /
+            Mathf.Max(0.01f, turnDistance));
+        return Steer(root.InverseTransformDirection(inward), localVelocity) * amount;
+    }
+
+    // Safety boundary: only correct birds that actually cross the circle.
+    void KeepInsideFlightArea(int i)
+    {
+        Vector3 world = root.TransformPoint(positions[i]);
+        Vector3 offset = world - habitatCentre;
+        offset.y = 0f;
+        float radius = GetFlightRadius();
+        if (offset.sqrMagnitude <= radius * radius) return;
+
+        Vector3 outward = offset.normalized;
+        world.x = habitatCentre.x + outward.x * radius;
+        world.z = habitatCentre.z + outward.z * radius;
+        positions[i] = root.InverseTransformPoint(world);
+
+        Vector3 worldVelocity = root.TransformDirection(velocities[i]);
+        float outwardSpeed = Vector3.Dot(worldVelocity, outward);
+        if (outwardSpeed > 0f)
+        {
+            // Remove outward motion; a small inward component avoids sticking.
+            worldVelocity -= outward * (outwardSpeed + MaxSpeed * 0.2f);
+            velocities[i] = root.InverseTransformDirection(worldVelocity);
+        }
     }
 
     Vector3 Steer(Vector3 desired, Vector3 velocity)
@@ -199,6 +250,36 @@ public class BoidsLab : MonoBehaviour
         }
     }
 
+    // Gradually steer down before reaching the maximum altitude above terrain.
+    Vector3 CeilingAvoidance(Vector3 localPosition, Vector3 localVelocity)
+    {
+        if (terrain == null) return Vector3.zero;
+        Vector3 world = root.TransformPoint(localPosition);
+        float groundY = terrain.SampleHeight(world) + terrain.transform.position.y;
+        float ceiling = groundY + Mathf.Max(maximumHeight, minimumHeight + 0.5f);
+        float buffer = Mathf.Min(3f, (ceiling - groundY - minimumHeight) * 0.4f);
+        if (world.y < ceiling - buffer) return Vector3.zero;
+        return Steer(root.InverseTransformDirection(Vector3.down), localVelocity);
+    }
+
+    // Hard safety limit; no bird can remain above the allowed flying height.
+    void KeepBelowCeiling(int i)
+    {
+        if (terrain == null) return;
+        Vector3 world = root.TransformPoint(positions[i]);
+        float groundY = terrain.SampleHeight(world) + terrain.transform.position.y;
+        float maxY = groundY + Mathf.Max(maximumHeight, minimumHeight + 0.5f);
+        if (world.y <= maxY) return;
+        world.y = maxY;
+        positions[i] = root.InverseTransformPoint(world);
+        Vector3 velocityWorld = root.TransformDirection(velocities[i]);
+        if (velocityWorld.y > 0f)
+        {
+            velocityWorld.y = 0f;
+            velocities[i] = root.InverseTransformDirection(velocityWorld);
+        }
+    }
+
     Vector3 TerrainAvoidance(Vector3 localPosition, Vector3 localVelocity)
     {
         if (terrain == null)
@@ -235,7 +316,7 @@ public class BoidsLab : MonoBehaviour
             int nearby = 0, close = 0;
             for (int j = 0; j < Count; j++)
             {
-                if (j == i || GroupOf(i) != GroupOf(j)) continue;
+                if (j == i) continue;
                 Vector3 delta = positions[i] - positions[j];
                 float squared = delta.sqrMagnitude;
                 if (squared > Perception * Perception) continue;
@@ -260,7 +341,7 @@ public class BoidsLab : MonoBehaviour
         CalculateForces();
         if (playing || stepRequested)
         {
-            float dt = stepRequested ? 1f / 30f : Mathf.Min(Time.deltaTime, 1f / 30f);
+            float dt = stepRequested ? 1f / 30f : Mathf.Min(Time.deltaTime, 0.05f);
             stepRequested = false;
             for (int i = 0; i < Count; i++)
             {
@@ -268,15 +349,16 @@ public class BoidsLab : MonoBehaviour
                     + alignment[i] * alignmentWeight
                     + cohesion[i] * cohesionWeight
                     + TerrainAvoidance(positions[i], velocities[i])
+                        * terrainAvoidanceWeight
+                    + CeilingAvoidance(positions[i], velocities[i])
                         * terrainAvoidanceWeight;
-                // Keep each group near its OWN centre, not one shared centre.
-                Vector3 fromGroupCentre = positions[i] - groupCentres[GroupOf(i)];
-                float excess = fromGroupCentre.magnitude - Radius;
-                if (excess > 0)
-                    force -= fromGroupCentre.normalized * excess * 3f;
+                // The only non-Boids boundary force acts at the terrain's edges.
+                force += HabitatAvoidance(positions[i], velocities[i]) * boundaryStrength;
                 velocities[i] = Vector3.ClampMagnitude(velocities[i] + force * dt, MaxSpeed);
                 positions[i] += velocities[i] * dt;
+                KeepInsideFlightArea(i);
                 KeepAboveGround(i);
+                KeepBelowCeiling(i);
             }
             CalculateForces();
         }
@@ -286,7 +368,7 @@ public class BoidsLab : MonoBehaviour
             if (velocities[i].sqrMagnitude > 0.000001f)
                 birds[i].localRotation = Quaternion.LookRotation(velocities[i]);
             birds[i].GetComponent<MeshRenderer>().sharedMaterial = i == selected ? selectedMaterial : birdMaterial;
-            bool neighbour = i != selected && GroupOf(i) == GroupOf(selected)
+            bool neighbour = i != selected
                 && (positions[i] - positions[selected]).sqrMagnitude < Perception * Perception;
             neighbourLines[i].enabled = inspect && neighbour;
             if (inspect && neighbour) SetLine(neighbourLines[i], positions[selected], positions[i]);
@@ -308,11 +390,22 @@ public class BoidsLab : MonoBehaviour
     void LateUpdate()
     {
         if (view == null) return;
+
         Vector3 centre = transform.position;
-        view.transform.position = centre + Quaternion.Euler(pitch, yaw, 0) * new Vector3(0, 0, -distance);
+
+        view.transform.position =
+            centre + Quaternion.Euler(pitch, yaw, 0)
+            * new Vector3(0, 0, -distance);
+
         view.transform.LookAt(centre);
+
         // Leave the left side for the learning controls.
-        view.rect = new Rect(Mathf.Min(0.48f, 370f / Screen.width), 0, 1f - Mathf.Min(0.48f, 370f / Screen.width), 1);
+        view.rect = new Rect(
+            Mathf.Min(0.48f, 370f / Screen.width),
+            0,
+            1f - Mathf.Min(0.48f, 370f / Screen.width),
+            1
+        );
     }
 
     float RuleSlider(string name, string explanation, float value)
@@ -332,7 +425,7 @@ public class BoidsLab : MonoBehaviour
         GUILayout.BeginArea(panel, GUI.skin.box);
         panelScroll = GUILayout.BeginScrollView(panelScroll);
         GUILayout.Label("BOIDS LEARNING LAB");
-        GUILayout.Label("How do local rules produce two flocks?");
+        GUILayout.Label("How do local rules produce flocks?");
         GUILayout.Space(10);
         separationWeight = RuleSlider("Separation (red)", "Avoid crowding close neighbours.", separationWeight);
         alignmentWeight = RuleSlider("Alignment (green)", "Match nearby boids' direction.", alignmentWeight);
@@ -357,7 +450,7 @@ public class BoidsLab : MonoBehaviour
         GUILayout.Label("1. Predict what happens without cohesion.\n2. Set cohesion to 0 and reset the flock.\n3. Restore it and compare the motion.");
         GUILayout.Space(12);
         GUILayout.Label("VIEW: drag in the scene to orbit; scroll to zoom.");
-        GUILayout.Label("Two independent groups (35 boids each). Each group has its own boundary and local neighbours. They do not merge.");
+        GUILayout.Label("There are no preset groups: birds respond only to nearby neighbours. A soft edge force plus a safety limit keep them in the chosen flight area. Flocks may form, split, or merge.");
         GUILayout.Label("Desktop prototype: AR tracking is not included yet.");
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -369,7 +462,7 @@ public class BoidsLab : MonoBehaviour
             if (evt.type == EventType.MouseDrag && evt.button == 0)
             { yaw += evt.delta.x * 0.4f; pitch = Mathf.Clamp(pitch + evt.delta.y * 0.4f, -80f, 80f); evt.Use(); }
             if (evt.type == EventType.ScrollWheel)
-            { distance = Mathf.Clamp(distance + evt.delta.y * 0.4f, 4f, 25f); evt.Use(); }
+            { distance = Mathf.Clamp(distance + evt.delta.y * 1f, 4f, 150f); }
         }
     }
 
