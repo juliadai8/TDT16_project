@@ -112,3 +112,11 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Local photo reconstruction inputs, environments and generated outputs
+/Reconstruction/.venv/
+/Reconstruction/deps/
+/Reconstruction/data/
+/Reconstruction/output/
+__pycache__/
+*.pyc
