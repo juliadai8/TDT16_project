@@ -1,0 +1,29 @@
+{
+  "source": "Middlebury Multi-View Stereo DinoRing",
+  "source_url": "https://vision.middlebury.edu/mview/data/",
+  "method": "Visual hull from conservative image silhouettes and supplied camera calibration",
+  "photos_available": 48,
+  "photos_used": 43,
+  "vertices": 108457,
+  "triangles": 217042,
+  "watertight": true,
+  "consistent_winding": true,
+  "volume_dataset_units_cubed": 0.00010322575311618114,
+  "voxel_volume_dataset_units_cubed": 0.00010347619548076571,
+  "coarse_mesh_volume_dataset_units_cubed": 0.00010280306271333115,
+  "voxel_step_dataset_units": 0.0005891485714285714,
+  "extents_dataset_units": [
+    0.07125141844153404,
+    0.0940184909850359,
+    0.06837630830705166
+  ],
+  "relative_resolution_difference": 0.004094815393347163,
+  "if_dataset_units_are_metres_cm3": 103.22575311618114,
+  "scale_note": "Primary output is dataset units cubed. The cm3 conversion assumes dataset coordinates are metres; no independent object-length reference was verified. Unity also offers explicit user calibration.",
+  "limitations": [
+    "Visual hull cannot recover concavities invisible in silhouettes.",
+    "Thresholding, shadows and mask expansion influence the outer shape.",
+    "Closed geometry does not establish measurement accuracy.",
+    "This is not reconstruction from arbitrary uncalibrated user photos."
+  ]
+}
