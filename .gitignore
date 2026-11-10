@@ -120,3 +120,37 @@ InitTestScene*.unity*
 /Reconstruction/output/
 __pycache__/
 *.pyc
+
+# Mac system files
+.DS_Store
+
+# COLMAP generated files
+/Reconstruction/**/database.db
+/Reconstruction/**/project.ini
+/Reconstruction/**/*.bin
+
+# Dense reconstruction and OpenMVS outputs
+/Reconstruction/**/dense/
+/Reconstruction/**/openmvs/
+/Reconstruction/**/*.ply
+
+# Intermediate analysis results
+/Reconstruction/**/*.npz
+
+# Original photographs
+/Reconstruction/**/images/
+
+# Python virtual environments
+.venv/
+
+# Old mesh imports - not used by the current Unity scene
+/Assets/PhotoObjectLab/BottleMesh.obj
+/Assets/PhotoObjectLab/BottleMesh.obj.meta
+/Assets/PhotoObjectLab/BottleMeshAligned.obj
+/Assets/PhotoObjectLab/BottleMeshAligned.obj.meta
+
+# Intermediate binary used to generate BottleMeshDirect.asset
+/Assets/PhotoObjectLab/Data/BottleMeshAligned.bytes
+/Assets/PhotoObjectLab/Data/BottleMeshAligned.bytes.meta
+/Assets/PhotoObjectLab/BottleMesh.mtl
+/Assets/PhotoObjectLab/BottleMesh.mtl.meta

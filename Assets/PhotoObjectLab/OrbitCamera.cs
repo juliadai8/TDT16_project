@@ -4,7 +4,8 @@ using UnityEngine.InputSystem;
 
 public class OrbitCamera : MonoBehaviour
 {
-    public Vector3 target = Vector3.zero;
+    public Transform target;
+
     public float distance = 3f;
     public float rotationSpeed = 0.2f;
     public float zoomSpeed = 0.002f;
@@ -24,7 +25,7 @@ public class OrbitCamera : MonoBehaviour
         if (mouse == null)
             return;
 
-        // Hold right mouse button to rotate
+        // Hold left mouse button to orbit around the target.
         if (mouse.leftButton.isPressed)
         {
             Vector2 delta = mouse.delta.ReadValue();
@@ -35,8 +36,9 @@ public class OrbitCamera : MonoBehaviour
             pitch = Mathf.Clamp(pitch, -89f, 89f);
         }
 
-        // Scroll to zoom
+        // Scroll to zoom.
         float scroll = mouse.scroll.ReadValue().y;
+
         distance -= scroll * zoomSpeed;
         distance = Mathf.Clamp(distance, 0.3f, 15f);
 
@@ -45,11 +47,14 @@ public class OrbitCamera : MonoBehaviour
 
     void UpdateCamera()
     {
+        Vector3 targetPosition =
+            target != null ? target.position : Vector3.zero;
+
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
 
         transform.position =
-            target + rotation * new Vector3(0, 0, -distance);
+            targetPosition + rotation * new Vector3(0, 0, -distance);
 
-        transform.LookAt(target);
+        transform.LookAt(targetPosition);
     }
 }

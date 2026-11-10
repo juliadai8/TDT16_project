@@ -10,11 +10,15 @@ public class BottlePointCloudViewer : MonoBehaviour
 {
     public TextAsset csvFile;
 
+    // Drag BottleMesh from the Hierarchy into this field.
+    public GameObject bottleMesh;
+
     [Range(0.002f, 0.03f)]
     public float pointSize = 0.008f;
 
     private Mesh mesh;
     private Material pointMaterial;
+    private MeshRenderer pointCloudRenderer;
 
     private Color32[] originalColors;
     private Color32[] countColors;
@@ -24,13 +28,19 @@ public class BottlePointCloudViewer : MonoBehaviour
     {
         Original,
         ObservationCount,
-        TriangulationAngle
+        TriangulationAngle,
+        Mesh
     }
 
     private DisplayMode currentMode = DisplayMode.Original;
 
     void Start()
     {
+        pointCloudRenderer = GetComponent<MeshRenderer>();
+
+        if (bottleMesh != null)
+            bottleMesh.SetActive(false);
+
         if (csvFile == null)
         {
             Debug.LogError("Assign bottle_unity.csv in the Inspector.");
@@ -38,6 +48,7 @@ public class BottlePointCloudViewer : MonoBehaviour
         }
 
         LoadPointCloud();
+        SetMode(currentMode);
     }
 
     void Update()
@@ -55,6 +66,9 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (keyboard.digit3Key.wasPressedThisFrame)
             SetMode(DisplayMode.TriangulationAngle);
+
+        if (keyboard.digit4Key.wasPressedThisFrame)
+            SetMode(DisplayMode.Mesh);
     }
 
     void LoadPointCloud()
@@ -147,7 +161,7 @@ public class BottlePointCloudViewer : MonoBehaviour
         }
 
         pointMaterial = new Material(shader);
-        GetComponent<MeshRenderer>().sharedMaterial = pointMaterial;
+        pointCloudRenderer.sharedMaterial = pointMaterial;
 
         Debug.Log($"Loaded {count} COLMAP points.");
     }
@@ -179,24 +193,41 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void SetMode(DisplayMode mode)
     {
+        if (mode == DisplayMode.Mesh && bottleMesh == null)
+        {
+            Debug.LogWarning(
+                "BottleMesh has not been assigned in the Inspector."
+            );
+            return;
+        }
+
         currentMode = mode;
 
-        if (mesh == null)
-            return;
+        bool showMesh = mode == DisplayMode.Mesh;
 
-        switch (mode)
+        // Keep this GameObject active because it handles the UI.
+        if (pointCloudRenderer != null)
+            pointCloudRenderer.enabled = !showMesh;
+
+        if (bottleMesh != null)
+            bottleMesh.SetActive(showMesh);
+
+        if (!showMesh && mesh != null)
         {
-            case DisplayMode.Original:
-                mesh.colors32 = originalColors;
-                break;
+            switch (mode)
+            {
+                case DisplayMode.Original:
+                    mesh.colors32 = originalColors;
+                    break;
 
-            case DisplayMode.ObservationCount:
-                mesh.colors32 = countColors;
-                break;
+                case DisplayMode.ObservationCount:
+                    mesh.colors32 = countColors;
+                    break;
 
-            case DisplayMode.TriangulationAngle:
-                mesh.colors32 = angleColors;
-                break;
+                case DisplayMode.TriangulationAngle:
+                    mesh.colors32 = angleColors;
+                    break;
+            }
         }
 
         Debug.Log("Display mode changed to: " + mode);
@@ -205,7 +236,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     void OnGUI()
     {
         GUILayout.BeginArea(
-            new Rect(15, 15, 205, 155),
+            new Rect(15, 15, 205, 190),
             GUI.skin.box
         );
 
@@ -219,6 +250,9 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (GUILayout.Button("Triangulation Angle"))
             SetMode(DisplayMode.TriangulationAngle);
+
+        if (GUILayout.Button("3D Mesh"))
+            SetMode(DisplayMode.Mesh);
 
         GUILayout.Label("Mode: " + currentMode);
 
