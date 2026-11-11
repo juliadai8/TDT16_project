@@ -12,22 +12,59 @@ public class OrbitCamera : MonoBehaviour
 
     private float yaw = 0f;
     private float pitch = 15f;
+    private BottlePointCloudViewer viewer;
+    private Vector2 pressPosition;
+    private bool allowOrbit;
+    private bool dragging;
+    private readonly ColmapMatchedView matchedView = new ColmapMatchedView();
+    public bool IsMatchedView => matchedView.Active;
+
+    public bool TryViewCamera(ColmapCameraDisplay.CameraRecord record,Transform frame,int orientation,
+                              Rect availablePixels,out string error)
+    {
+        allowOrbit=false;dragging=false;
+        return matchedView.TryEnter(GetComponent<Camera>(),frame,record,orientation,availablePixels,out error);
+    }
+
+    public void ReturnToOrbit()
+    {
+        matchedView.Dispose();allowOrbit=false;dragging=false;
+    }
+
+    public void DrawMatchedMargins() { matchedView.DrawMargins(); }
+    public void DrawPhotoComparison(Texture photo,bool showPhoto,float photoOpacity,float reconstructionOpacity,bool tintCyan=false)
+    { matchedView.DrawComparison(photo,showPhoto,photoOpacity,reconstructionOpacity,tintCyan); }
 
     void Start()
     {
+        viewer = FindAnyObjectByType<BottlePointCloudViewer>();
         UpdateCamera();
     }
 
     void LateUpdate()
     {
+        if(IsMatchedView)
+        {
+            matchedView.Refresh(viewer!=null?viewer.MatchedViewArea:new Rect(0,0,Screen.width,Screen.height));
+            return;
+        }
         Mouse mouse = Mouse.current;
 
         if (mouse == null)
             return;
 
-        // Hold left mouse button to orbit around the target.
-        if (mouse.leftButton.isPressed)
+        Vector2 position = mouse.position.ReadValue();
+        if (mouse.leftButton.wasPressedThisFrame)
         {
+            pressPosition = position;
+            dragging = false;
+            allowOrbit = viewer == null || (!viewer.IsPointerOverUI(position) && !viewer.IsPointerOverCamera(position));
+        }
+        // Begin orbiting only after a drag. Clicks on cameras and UI stay still.
+        if (mouse.leftButton.isPressed && allowOrbit &&
+            (dragging || (position-pressPosition).sqrMagnitude > 36f))
+        {
+            dragging = true;
             Vector2 delta = mouse.delta.ReadValue();
 
             yaw += delta.x * rotationSpeed;
@@ -37,7 +74,7 @@ public class OrbitCamera : MonoBehaviour
         }
 
         // Scroll to zoom.
-        float scroll = mouse.scroll.ReadValue().y;
+        float scroll = viewer != null && viewer.IsPointerOverUI(position) ? 0 : mouse.scroll.ReadValue().y;
 
         distance -= scroll * zoomSpeed;
         distance = Mathf.Clamp(distance, 0.3f, 15f);
@@ -57,4 +94,6 @@ public class OrbitCamera : MonoBehaviour
 
         transform.LookAt(targetPosition);
     }
+
+    void OnDisable() { matchedView.Dispose(); }
 }

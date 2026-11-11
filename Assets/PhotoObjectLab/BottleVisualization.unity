@@ -566,7 +566,7 @@ MonoBehaviour:
   target: {fileID: 0}
   distance: 3
   rotationSpeed: 0.2
-  zoomSpeed: 0.002
+  zoomSpeed: 0.3
 --- !u!4 &1195368303 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: cdf0b13a1c1df4141b15b36b018757ba, type: 3}

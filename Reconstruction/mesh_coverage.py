@@ -178,7 +178,7 @@ def camera_visibility(points, normals, camera, intrinsics):
     return in_front & inside_image & front_facing
 
 
-def check_occlusion(mesh, points, camera, candidates, batch_size=200):
+def check_occlusion(mesh, points, camera, candidates, batch_size=5):
     """
     Return a boolean mask of surface points visible from a camera.
 

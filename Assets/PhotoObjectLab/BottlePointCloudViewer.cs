@@ -19,6 +19,28 @@ public class BottlePointCloudViewer : MonoBehaviour
     private Mesh mesh;
     private Material pointMaterial;
     private MeshRenderer pointCloudRenderer;
+    private BottleMeshCoverageDisplay coverageDisplay;
+    private string coverageError;
+    private ColmapCameraDisplay cameraDisplay;
+    private string cameraError;
+    private readonly ColmapImagePreview imagePreview = new ColmapImagePreview();
+    private Vector2 cameraClickStart;
+    private bool cameraClickArmed;
+    private OrbitCamera orbitCamera;
+    private bool showComparisonPhoto=true;
+    private float comparisonPhotoOpacity=.5f;
+    private float comparisonModelOpacity=1f;
+    private bool tintComparisonModel=true;
+    private bool IsMatchedView => orbitCamera!=null && orbitCamera.IsMatchedView;
+    public Rect MatchedViewArea => Screen.width>=680
+        ? new Rect(15,15,Screen.width-365,Mathf.Max(1,Screen.height-30))
+        : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
+
+    private Rect ControlPanelRect => new Rect(15,15,300,440);
+    private Rect SelectionPanelRect => Screen.width >= 680
+        ? new Rect(Screen.width-335,15,320,Mathf.Min(620,Screen.height-30))
+        : new Rect(15,465,Mathf.Min(320,Screen.width-30),620);
+    private Vector2 selectionPanelScroll;
 
     private Color32[] originalColors;
     private Color32[] countColors;
@@ -29,7 +51,8 @@ public class BottlePointCloudViewer : MonoBehaviour
         Original,
         ObservationCount,
         TriangulationAngle,
-        Mesh
+        Mesh,
+        MeshCoverage
     }
 
     private DisplayMode currentMode = DisplayMode.Original;
@@ -37,6 +60,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     void Start()
     {
         pointCloudRenderer = GetComponent<MeshRenderer>();
+        if(Camera.main!=null)orbitCamera=Camera.main.GetComponent<OrbitCamera>();
 
         if (bottleMesh != null)
             bottleMesh.SetActive(false);
@@ -53,6 +77,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void Update()
     {
+        HandleCameraSelection();
         Keyboard keyboard = Keyboard.current;
 
         if (keyboard == null)
@@ -69,6 +94,91 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (keyboard.digit4Key.wasPressedThisFrame)
             SetMode(DisplayMode.Mesh);
+
+        if (keyboard.digit5Key.wasPressedThisFrame)
+            SetMode(DisplayMode.MeshCoverage);
+
+        if (keyboard.cKey.wasPressedThisFrame && !IsMatchedView)
+            SetCamerasVisible(cameraDisplay == null || !cameraDisplay.Visible);
+
+        if (keyboard.escapeKey.wasPressedThisFrame)
+        {
+            if(IsMatchedView)ReturnToOrbit();
+            else
+            {
+                cameraDisplay?.ClearSelection();
+                imagePreview.SetImage(null);
+            }
+        }
+    }
+
+    public bool IsPointerOverUI(Vector2 screenPosition)
+    {
+        Vector2 gui = new Vector2(screenPosition.x, Screen.height-screenPosition.y);
+        return (!IsMatchedView && ControlPanelRect.Contains(gui)) ||
+            (cameraDisplay != null && cameraDisplay.Visible && cameraDisplay.Selected != null && SelectionPanelRect.Contains(gui));
+    }
+
+    public bool IsPointerOverCamera(Vector2 screenPosition)
+    {
+        Camera view = Camera.main;
+        return view != null && cameraDisplay != null &&
+            cameraDisplay.TryPick(view.ScreenPointToRay(screenPosition), out _);
+    }
+
+    void HandleCameraSelection()
+    {
+        if(IsMatchedView){cameraClickArmed=false;return;}
+        Mouse mouse = Mouse.current;
+        if (mouse == null) return;
+        Vector2 position = mouse.position.ReadValue();
+        if (mouse.leftButton.wasPressedThisFrame)
+        {
+            cameraClickStart = position;
+            cameraClickArmed = cameraDisplay != null && cameraDisplay.Visible && !IsPointerOverUI(position);
+        }
+        if (mouse.leftButton.isPressed && (position-cameraClickStart).sqrMagnitude > 36f)
+            cameraClickArmed = false;
+        if (!mouse.leftButton.wasReleasedThisFrame) return;
+        bool click = cameraClickArmed && (position-cameraClickStart).sqrMagnitude <= 36f && !IsPointerOverUI(position);
+        cameraClickArmed = false;
+        Camera view = Camera.main;
+        if (!click || view == null) return;
+        cameraDisplay.SelectFromRay(view.ScreenPointToRay(position));
+        imagePreview.SetImage(cameraDisplay.Selected);
+    }
+
+    void SetCamerasVisible(bool visible)
+    {
+        if(IsMatchedView)ReturnToOrbit();
+        if (cameraDisplay == null) cameraDisplay = new ColmapCameraDisplay();
+        if (!cameraDisplay.TrySetVisible(transform, visible, out cameraError))
+            Debug.LogWarning(cameraError);
+        if (!visible) imagePreview.SetImage(null);
+    }
+
+    void ViewSelectedCamera()
+    {
+        var record=cameraDisplay?.Selected;
+        if(record==null)return;
+        if(orbitCamera==null){cameraError="The scene camera needs its OrbitCamera component.";return;}
+        if(record.imageWidth<=0 || record.focalLength<=0)
+        {cameraError="Regenerate export_colmap_cameras.py to include camera calibration.";return;}
+        imagePreview.SetImage(record,true);
+        if(imagePreview.Texture==null || !imagePreview.IsUndistorted)
+        {cameraError=imagePreview.Status??"The original photo is required for a calibrated comparison.";return;}
+        if(!orbitCamera.TryViewCamera(record,transform,imagePreview.Orientation,MatchedViewArea,out cameraError))
+        {imagePreview.SetImage(record);return;}
+        cameraDisplay.SetSuppressed(true);
+        cameraClickArmed=false;
+    }
+
+    void ReturnToOrbit()
+    {
+        orbitCamera?.ReturnToOrbit();
+        cameraDisplay?.SetSuppressed(false);
+        imagePreview.SetImage(cameraDisplay?.Selected);
+        cameraError=null;
     }
 
     void LoadPointCloud()
@@ -193,7 +303,8 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void SetMode(DisplayMode mode)
     {
-        if (mode == DisplayMode.Mesh && bottleMesh == null)
+        bool showMesh = mode == DisplayMode.Mesh || mode == DisplayMode.MeshCoverage;
+        if (showMesh && bottleMesh == null)
         {
             Debug.LogWarning(
                 "BottleMesh has not been assigned in the Inspector."
@@ -201,9 +312,23 @@ public class BottlePointCloudViewer : MonoBehaviour
             return;
         }
 
-        currentMode = mode;
+        if (mode == DisplayMode.MeshCoverage)
+        {
+            if (coverageDisplay == null)
+                coverageDisplay = new BottleMeshCoverageDisplay();
+            if (!coverageDisplay.TryShow(bottleMesh, out coverageError))
+            {
+                Debug.LogWarning(coverageError);
+                return;
+            }
+        }
+        else
+        {
+            coverageDisplay?.Restore();
+            coverageError = null;
+        }
 
-        bool showMesh = mode == DisplayMode.Mesh;
+        currentMode = mode;
 
         // Keep this GameObject active because it handles the UI.
         if (pointCloudRenderer != null)
@@ -235,12 +360,21 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void OnGUI()
     {
+        if(IsMatchedView)
+        {
+            orbitCamera.DrawMatchedMargins();
+            bool plainColors=currentMode==DisplayMode.Original || currentMode==DisplayMode.Mesh;
+            orbitCamera.DrawPhotoComparison(imagePreview.Texture,showComparisonPhoto,comparisonPhotoOpacity,comparisonModelOpacity,
+                tintComparisonModel && plainColors);
+            DrawSelectedCamera();
+            return;
+        }
         GUILayout.BeginArea(
-            new Rect(15, 15, 205, 190),
+            ControlPanelRect,
             GUI.skin.box
         );
 
-        GUILayout.Label("Point Cloud Visualization");
+        GUILayout.Label("Bottle Visualization (keys 1-5)");
 
         if (GUILayout.Button("Original Colors"))
             SetMode(DisplayMode.Original);
@@ -254,13 +388,101 @@ public class BottlePointCloudViewer : MonoBehaviour
         if (GUILayout.Button("3D Mesh"))
             SetMode(DisplayMode.Mesh);
 
+        if (GUILayout.Button("Mesh Coverage"))
+            SetMode(DisplayMode.MeshCoverage);
+
+        bool showCameras = cameraDisplay != null && cameraDisplay.Visible;
+        bool guiEnabled=GUI.enabled;
+        if(IsMatchedView)GUI.enabled=false;
+        bool requested = GUILayout.Toggle(showCameras, "Show COLMAP cameras (C)");
+        GUI.enabled=guiEnabled;
+        if (requested != showCameras) SetCamerasVisible(requested);
+        if (cameraDisplay != null && cameraDisplay.Visible)
+        {
+            if(IsMatchedView)GUILayout.Label("Matched view: camera markers hidden.");
+            GUILayout.Label(cameraDisplay.Count + " registered camera poses");
+            GUILayout.Label("Click a camera to identify its image.");
+            GUILayout.Label("Yellow: selected. Orange: direction/up.");
+            GUILayout.Label("Drag empty space to orbit. Scroll to zoom.");
+        }
+        if (!string.IsNullOrEmpty(cameraError)) GUILayout.Label(cameraError);
+
         GUILayout.Label("Mode: " + currentMode);
 
+        if (currentMode == DisplayMode.MeshCoverage && coverageDisplay != null)
+        {
+            GUILayout.Label("Visible cameras: 0 to " + coverageDisplay.MaximumCount);
+            GUILayout.Label("Red: low   Yellow: middle   Green: high");
+            GUILayout.Label("Gray: no nearby compatible sample");
+            GUILayout.Label("Approximate colors from " + coverageDisplay.SampleCount +
+                " surface samples and " + coverageDisplay.CameraCount + " cameras.");
+        }
+        if (!string.IsNullOrEmpty(coverageError))
+            GUILayout.Label(coverageError);
+
+        GUILayout.EndArea();
+        DrawSelectedCamera();
+    }
+
+    void DrawSelectedCamera()
+    {
+        var record = cameraDisplay != null && cameraDisplay.Visible ? cameraDisplay.Selected : null;
+        if (record == null) return;
+        GUILayout.BeginArea(SelectionPanelRect, GUI.skin.box);
+        selectionPanelScroll=GUILayout.BeginScrollView(selectionPanelScroll);
+        var wrap = new GUIStyle(GUI.skin.label) { wordWrap = true };
+        GUILayout.Label("Selected camera", GUI.skin.label);
+        GUILayout.Label(record.imageName, wrap);
+        GUILayout.Label("COLMAP image ID: " + record.imageId);
+        if(IsMatchedView)
+        {
+            GUILayout.Label("Matched viewpoint and image framing");
+            GUILayout.Label("Lens-corrected comparison photo");
+            GUILayout.Label("Compare modes with keys 1-5");
+            GUILayout.Label("Reconstruction: "+currentMode);
+            GUILayout.BeginHorizontal();
+            if(GUILayout.Button("Point cloud"))SetMode(DisplayMode.Original);
+            if(GUILayout.Button("3D mesh"))SetMode(DisplayMode.Mesh);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if(GUILayout.Button("Model only")){showComparisonPhoto=false;comparisonModelOpacity=1;}
+            if(GUILayout.Button("Blend")){showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=.5f;}
+            if(GUILayout.Button("Photo only")){showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=0;}
+            GUILayout.EndHorizontal();
+            if(currentMode==DisplayMode.Original || currentMode==DisplayMode.Mesh)
+                tintComparisonModel=GUILayout.Toggle(tintComparisonModel,"Tint reconstruction cyan");
+            showComparisonPhoto=GUILayout.Toggle(showComparisonPhoto,"Photo behind reconstruction");
+            GUILayout.Label("Photo opacity: "+Mathf.RoundToInt(comparisonPhotoOpacity*100)+"%");
+            bool enabled=GUI.enabled;GUI.enabled=showComparisonPhoto;
+            comparisonPhotoOpacity=GUILayout.HorizontalSlider(comparisonPhotoOpacity,0,1);
+            GUI.enabled=enabled;
+            GUILayout.Label("Reconstruction opacity: "+Mathf.RoundToInt(comparisonModelOpacity*100)+"%");
+            comparisonModelOpacity=GUILayout.HorizontalSlider(comparisonModelOpacity,0,1);
+            if(GUILayout.Button("Return to free orbit (Esc)"))ReturnToOrbit();
+        }
+        else if(GUILayout.Button("View from selected camera"))ViewSelectedCamera();
+        if (imagePreview.Texture != null)
+        {
+            Rect imageRect = GUILayoutUtility.GetRect(SelectionPanelRect.width-20,240);
+            imagePreview.Draw(imageRect);
+        }
+        else GUILayout.Label(imagePreview.Status ?? "Original photo not available locally.",wrap);
+        if (GUILayout.Button("Clear selection (Esc)"))
+        {
+            if(IsMatchedView)ReturnToOrbit();
+            cameraDisplay.ClearSelection();
+            imagePreview.SetImage(null);
+        }
+        GUILayout.EndScrollView();
         GUILayout.EndArea();
     }
 
     void OnDestroy()
     {
+        orbitCamera?.ReturnToOrbit();
+        imagePreview.Dispose();
+        cameraDisplay?.Dispose();
+        coverageDisplay?.Dispose();
         if (mesh != null)
             Destroy(mesh);
 
