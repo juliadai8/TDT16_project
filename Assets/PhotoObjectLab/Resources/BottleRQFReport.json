@@ -1,0 +1,384 @@
+{
+  "method": "RQF (Neumann et al., 2025), sampled OpenMVS adaptation",
+  "doi": "10.1007/s11042-025-20596-6",
+  "alpha": 2,
+  "samples": 4799,
+  "registered_cameras": 73,
+  "dense_points_near_mesh": 331748,
+  "mesh_vertices": 166953,
+  "mesh_triangles": 333861,
+  "boundary_vertices": 43,
+  "nonmanifold_edges": 0,
+  "boundary_classifier": "topological open boundaries: edges incident to exactly one triangle",
+  "texture_unknown_samples": 1,
+  "unassigned_vertices": 2926,
+  "density_radius_source_units": 0.04130404368234521,
+  "spatial_min_neighbors": 16,
+  "working_distance_source_units": 4.3091872422026185,
+  "proposals": 128,
+  "occluded_proposals_rejected": 0,
+  "normalizations": {
+    "coverage": {
+      "mean": 20.0,
+      "std": 7.0
+    },
+    "density": {
+      "mean": 242.91539904146697,
+      "std": 83.09725577840594
+    },
+    "edge": {
+      "mean": 1.5128499490854108,
+      "std": 0.8023339576294612
+    },
+    "texture": {
+      "mean": 0.020134898387714244,
+      "std": 0.010188937287775349
+    }
+  },
+  "sample_snap_distance_p95": 0.009201363011192926,
+  "raw_ranges": {
+    "coverage": [
+      0.0,
+      50.0
+    ],
+    "density": [
+      5.0,
+      509.0
+    ],
+    "edge": [
+      0.002878901641565605,
+      3.163516442231116
+    ],
+    "texture": [
+      0.0037956427840981632,
+      0.0768078398560324
+    ]
+  },
+  "metric_ranges": {
+    "coverage": [
+      0.00018940594382518605,
+      0.36090725483714875
+    ],
+    "density": [
+      0.0016519047355461054,
+      0.9570064274793337
+    ],
+    "edge": [
+      0.016069030008238235,
+      0.9712569636810334
+    ],
+    "texture": [
+      1.4747728055331624e-05,
+      0.8178360622270899
+    ],
+    "rqf": [
+      0.013338259132054588,
+      0.28853105334876467
+    ]
+  },
+  "mesh_sha256": "bb637dfbdf6ccfb4fb63c2f0ecbad0293ce9b29a128534a31fe9c467b5188644",
+  "image_fingerprints": [
+    {
+      "name": "IMG_5583.jpeg",
+      "sha256": "3e8e10bdc3b5c0a343d6ba9a744e6b8f0159e5a78dfff29e832a6ed0021a3d57"
+    },
+    {
+      "name": "IMG_5585.jpeg",
+      "sha256": "1d34a43c60f8084a19fdb2a1b041a6e2299be927f28fcb6d3771d18169b28206"
+    },
+    {
+      "name": "IMG_5586.jpeg",
+      "sha256": "2ed8ab524bc50dbe9f5def4e420d96b58f61b377bcdf63614671cf7c05493294"
+    },
+    {
+      "name": "IMG_5587.jpeg",
+      "sha256": "4d4c32bcac147e925030c8d18a22b176eff9a41e67ee103c3a541f5e7ca7125d"
+    },
+    {
+      "name": "IMG_5588.jpeg",
+      "sha256": "78da7a41ff1de9c0ef9107037aa72029d8af5071aa1c4a9db3bc8977ccfece28"
+    },
+    {
+      "name": "IMG_5589.jpeg",
+      "sha256": "62cb6fcc9bbbb70c4d0221630942ed8e817f595e4ba2208f9c6c4d7e1e939752"
+    },
+    {
+      "name": "IMG_5590.jpeg",
+      "sha256": "e92e4cb83b9d7a14f99e7cbca765bc08bf40e70ba056fff712075d434d9d623e"
+    },
+    {
+      "name": "IMG_5591.jpeg",
+      "sha256": "8185964e590d7769be35bf752442ca556c3fdf5252dbe76a84eeca6c217f4f60"
+    },
+    {
+      "name": "IMG_5592.jpeg",
+      "sha256": "34ecc3f3e44656abf67ffc9d23a5bb1835dd71cbee9539c0bf4a8a962a5435ba"
+    },
+    {
+      "name": "IMG_5593.jpeg",
+      "sha256": "4c14810162b371c6d9bb143bee0a642c407704b95b67d6d1b686298828269b75"
+    },
+    {
+      "name": "IMG_5594.jpeg",
+      "sha256": "710fa5fe1db0b03b44c4b6013af4f390729c240de07ea9ae4d6ee704eceb0a49"
+    },
+    {
+      "name": "IMG_5595.jpeg",
+      "sha256": "b598e843c4b1376459ccb9b1a472d36935c0b2c9d04c3220d08c646c8270003f"
+    },
+    {
+      "name": "IMG_5596.jpeg",
+      "sha256": "534aa6d8916fa88d929cb3329d6a25bb9073713342253c3a6bb8709b00d4f6d8"
+    },
+    {
+      "name": "IMG_5597.jpeg",
+      "sha256": "9b98b2a1891d5416ccf57811a1921311c507a6b8ee750df6bf0dae2df1d471b5"
+    },
+    {
+      "name": "IMG_5598.jpeg",
+      "sha256": "100a11bcc321b20fb700d0b0dafb61fdc53249bd3ce72e84ea29b824b371b44e"
+    },
+    {
+      "name": "IMG_5599.jpeg",
+      "sha256": "6b2d6b81297b953467f407b3f771783cf635c2ea11a755ee6731c9abcc0e583d"
+    },
+    {
+      "name": "IMG_5600.jpeg",
+      "sha256": "f3750d9c6e78a5543782d1509ee40dd8c34f5354b6efa66f3f204f96fb971817"
+    },
+    {
+      "name": "IMG_5601.jpeg",
+      "sha256": "03a46effe52c489b0416e07bc74fbff4affaeb2c96a1a5d293dcaa5ab0cfa61a"
+    },
+    {
+      "name": "IMG_5602.jpeg",
+      "sha256": "b1b42b06359386b80d1e012f945a3089db82c05faf6d79f86b0668e3865a8519"
+    },
+    {
+      "name": "IMG_5603.jpeg",
+      "sha256": "369f4e3e5c3a26d935f4666885e2485b9a818dad8d5d58578bdb7d0abbea18d7"
+    },
+    {
+      "name": "IMG_5604.jpeg",
+      "sha256": "58e32262e503167e961da54302303bb12d6937edcc55a36ddd75b830bbfadc6e"
+    },
+    {
+      "name": "IMG_5605.jpeg",
+      "sha256": "372cd57608d518481acc1492f3917a472c904daf2ceeb4b71f55dcc0622c806a"
+    },
+    {
+      "name": "IMG_5606.jpeg",
+      "sha256": "5a46cd4350e1200bcc3cc02166cff96f064e61712570635d58dbb1f1309ce9fe"
+    },
+    {
+      "name": "IMG_5607.jpeg",
+      "sha256": "39a7e996d58d532ce4b26022b794bffda9d98deb6f420a9b9add3b5f6260717a"
+    },
+    {
+      "name": "IMG_5608.jpeg",
+      "sha256": "b5f76150a92bf43dce2b8b082a662e0fdfef0733a4da525493af17cc77c9d799"
+    },
+    {
+      "name": "IMG_5609.jpeg",
+      "sha256": "1e42fdc15c8ab1ddfa56d1d9c38b38096af71278a0e7d56fd74098f66986d847"
+    },
+    {
+      "name": "IMG_5610.jpeg",
+      "sha256": "795ede1af74a654664b854ae3db99bf9ddc893d484a3b77b5f11f552a0046925"
+    },
+    {
+      "name": "IMG_5611.jpeg",
+      "sha256": "dcd8dd4614216f3e3a19b3cb92daabc27db80469ff855ff7f8fa79aa29d28337"
+    },
+    {
+      "name": "IMG_5612.jpeg",
+      "sha256": "6ddcd92b4f2b2ae4d3a5e79920f87fd62c0b4c0d34fef718db60b5da75c9a56d"
+    },
+    {
+      "name": "IMG_5613.jpeg",
+      "sha256": "4d8c237efb50ae32f060ef28510862a60385c35eaea6f49310e8c8c4dcce96cd"
+    },
+    {
+      "name": "IMG_5614.jpeg",
+      "sha256": "ed2343d4f5bc3d5e4711481fa7540cb6408184f1597981b413f597f5b2f0ae85"
+    },
+    {
+      "name": "IMG_5615.jpeg",
+      "sha256": "c29899d0c1a3b484c4fa03be4ac1884331ab4de49f14f0cb520df4b75f39b428"
+    },
+    {
+      "name": "IMG_5616.jpeg",
+      "sha256": "8e5c55b023ead0dca27a57fe4ae4190f0b9ae0cf67fd1aadc812425f3e80f903"
+    },
+    {
+      "name": "IMG_5617.jpeg",
+      "sha256": "89e6eb2f3505779f26416944cbc1935d8477b3407ab704212520f4dd86ba4380"
+    },
+    {
+      "name": "IMG_5618.jpeg",
+      "sha256": "ec7199d90a7b8d27093942b41729cfb82ac50e60e84b8c1e2a85d3f50488bddd"
+    },
+    {
+      "name": "IMG_5619.jpeg",
+      "sha256": "ceccd1595f47bdbb0eea7713ef0ac3d84e11faafcfcf539b9809172091f98196"
+    },
+    {
+      "name": "IMG_5620.jpeg",
+      "sha256": "952140992b2f45edd9ed0229e0e032b936016ff881fe6b03e51937e1506ac89d"
+    },
+    {
+      "name": "IMG_5621.jpeg",
+      "sha256": "baa7b1b2810204736a21e823434112591ff994c15e35bd63c6828eac38f9e535"
+    },
+    {
+      "name": "IMG_5622.jpeg",
+      "sha256": "d832f6df496b894a55f59541e4f3866821909e30a4252c995c6cc6fe0c2f84e4"
+    },
+    {
+      "name": "IMG_5623.jpeg",
+      "sha256": "9df3adff774ec3d389bf94a887f79d9cca6af1fd9dbdcafbcab6f53d0cd62ce9"
+    },
+    {
+      "name": "IMG_5624.jpeg",
+      "sha256": "233d7a13cf32fcf23139e8a40c99c0d6bf87c04e08644656bc26689b63635f0e"
+    },
+    {
+      "name": "IMG_5625.jpeg",
+      "sha256": "b0d14002278b10caa78b833dfa77b5eda7d6473dd79933a4befdb0a28e572533"
+    },
+    {
+      "name": "IMG_5626.jpeg",
+      "sha256": "44e19afb7debc9baf930bb1751259e6fa7aeb3af3046407e1e2bf60cdd3348e2"
+    },
+    {
+      "name": "IMG_5627.jpeg",
+      "sha256": "097b0dee1fa313b895fa663a71599bb1c78df9c04092eccf4fa82ea1c13d5b45"
+    },
+    {
+      "name": "IMG_5628.jpeg",
+      "sha256": "9fd02a261be9893807117598ef4529b2fb58df6dbfd88def1b92beda4cbf6f9e"
+    },
+    {
+      "name": "IMG_5629.jpeg",
+      "sha256": "ed2b5ffb5e78d66e77ea706f3e3eb35b58378e4365754965ec14af833138ee6a"
+    },
+    {
+      "name": "IMG_5630.jpeg",
+      "sha256": "465b94d2642cd30709c8da87ddd3fcfa262fda73a60ab8c0050712e6d48ba479"
+    },
+    {
+      "name": "IMG_5631.jpeg",
+      "sha256": "75de646bf4e83e415cbbf6d45a8f29e9c5239819c64ffacbd4f1bb127f464983"
+    },
+    {
+      "name": "IMG_5632.jpeg",
+      "sha256": "b22f4e4555245651add1e82f75fb2f3059d5a6e65903b47a426fedb8c43ee462"
+    },
+    {
+      "name": "IMG_5633.jpeg",
+      "sha256": "588f61229a2a4bc3d9840b190369e3bad60ca65608b44fda88f1bd35c4425b1d"
+    },
+    {
+      "name": "IMG_5634.jpeg",
+      "sha256": "fe73c1504c1794f5abf22bbcc631d0a0b68f267a0eae90eab1669d68a4df7b9c"
+    },
+    {
+      "name": "IMG_5635.jpeg",
+      "sha256": "52ae6fd96146b7840177557d4c5f9d987d4064d79cfa0c9f186eb5fb7b28654e"
+    },
+    {
+      "name": "IMG_5636.jpeg",
+      "sha256": "66bf808da46195890a74ca8374ea37a636557d44596ec3d1c27c9b0ad271a3b1"
+    },
+    {
+      "name": "IMG_5637.jpeg",
+      "sha256": "f69c702b3d73190d75efcbd417575ebbfc3c07ab2aa89426c1b8ce98102435b3"
+    },
+    {
+      "name": "IMG_5638.jpeg",
+      "sha256": "218cfaa6597bcdd39868914220807b1202bd90113c34333285fa5660b94a832f"
+    },
+    {
+      "name": "IMG_5639.jpeg",
+      "sha256": "8b1fdac23d76ae918911869f4c86422887308fab2b68c13fc529bd0df275bc52"
+    },
+    {
+      "name": "IMG_5640.jpeg",
+      "sha256": "254ddaf935e9d41e19f4d04204f6d19f061238291ba1835860af145ff37c5d29"
+    },
+    {
+      "name": "IMG_5641.jpeg",
+      "sha256": "a2485e73659c006505152fecacb28432b430f4301de4a4795c90c4a3951dc168"
+    },
+    {
+      "name": "IMG_5642.jpeg",
+      "sha256": "95681ef3696c4a2c754e02e9afc0feb086760dbc7bb2240721f973213eda2794"
+    },
+    {
+      "name": "IMG_5643.jpeg",
+      "sha256": "6e144b27df31963a765479d01974f38c48b546dba8528d6f1da2b2ea061766e9"
+    },
+    {
+      "name": "IMG_5644.jpeg",
+      "sha256": "37a9e70f63c17575032b865678b1e946c455e1e7b6f70a86ce0b8c2dc6e612b1"
+    },
+    {
+      "name": "IMG_5645.jpeg",
+      "sha256": "28c6141edf214e021bdfb4df78ad60a6497bd3136c92a1c83cd46f5269be2bbc"
+    },
+    {
+      "name": "IMG_5646.jpeg",
+      "sha256": "74803cfd7b09de566d9f512f7199504a865a87399223f739ed6734cac685a17b"
+    },
+    {
+      "name": "IMG_5647.jpeg",
+      "sha256": "9b97a799e3350f111b6fb477e915b782ae9c61854e418999e2b0fe60185885fc"
+    },
+    {
+      "name": "IMG_5648.jpeg",
+      "sha256": "c59668618f25f75067fad83b372deaa093e9b0d5f3376614e590b15b5a4fce8d"
+    },
+    {
+      "name": "IMG_5649.jpeg",
+      "sha256": "0869fd8b92c924b46440d6bcc20a2ded47d27b14998b3d6c3dc5e047a19856ba"
+    },
+    {
+      "name": "IMG_5650.jpeg",
+      "sha256": "0020cd3903d78c96b1957fe05c45a1d11acc6c1f39e6742c0f74ca634770324a"
+    },
+    {
+      "name": "IMG_5651.jpeg",
+      "sha256": "405bf6cd4441231e13bd9e9dfa74eb6203cf7c73edc47e26a344e2c62f79803d"
+    },
+    {
+      "name": "IMG_5652.jpeg",
+      "sha256": "065167f8c78dd119fe437994ba0a82b5186f3df72b8930f031238a34504bcbe9"
+    },
+    {
+      "name": "IMG_5653.jpeg",
+      "sha256": "012c83a7995cea986a0448d3da34b17e4ba270f284a5fd577a42848e58ff8aa6"
+    },
+    {
+      "name": "IMG_5654.jpeg",
+      "sha256": "58da6b0098d47ca79d136d26e78b42fad6eb035d77fed18e51b55aca5988e0cd"
+    },
+    {
+      "name": "IMG_5655.jpeg",
+      "sha256": "a7c5915f7dfe8a0c48ac6b3b86cde6da34815cbcbd62e92bc250ee1785ac619f"
+    },
+    {
+      "name": "IMG_5656.jpeg",
+      "sha256": "ab3dc1cc60f1048ccd6f4a0f2ddaf9f150d5674423da57fea3b98c11d2bfd9be"
+    }
+  ],
+  "adaptations": [
+    "OpenMVS mesh instead of new Poisson mesh",
+    "topological boundaries instead of angle-sum classifier",
+    "sampled dense cloud, snapped to nearest local triangles for visibility",
+    "CPU BVH instead of GPU point renderer",
+    "7x7 gradient windows at image max side 1600",
+    "16-neighbor spatial minimum on samples (configurable)",
+    "working distance estimated from camera poses unless supplied",
+    "fixed reconstruction; no simulated metric updates"
+  ]
+}

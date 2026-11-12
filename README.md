@@ -16,6 +16,14 @@ If needed, use **Tools > Photo Object > Create Dinosaur Scene** to generate a fr
 
 ## Reconstruction
 
+The bottle scene includes **RQF filters + next-best-view**, a sampled OpenMVS
+adaptation of Neumann et al. (2025). Open
+`Assets/PhotoObjectLab/BottleVisualization.unity`, enter Play mode, and select
+that button to explore four reconstruction need filters, their combined RQF
+metric and one recommended camera at a time. It uses all 73 calibrated photos.
+See [RQF.md](RQF.md) for the published formula, adaptations, generation command
+and validation.
+
 `Reconstruction/` contains the Python pipeline, dependency list, source attribution, and dataset downloader. See its README to reproduce the model. Python is optional for running the supplied Unity viewer.
 
 The prototype uses a calibrated silhouette **visual hull**, with camera positions and orientations supplied by the Middlebury DinoRing dataset. It does not yet estimate camera poses from arbitrary phone photos. The object includes its integrated pedestal; the pedestal is included in volume. Silhouettes cannot recover hidden concavities, and a closed mesh does not establish measurement accuracy.

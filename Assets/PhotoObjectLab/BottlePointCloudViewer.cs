@@ -21,6 +21,8 @@ public class BottlePointCloudViewer : MonoBehaviour
     private MeshRenderer pointCloudRenderer;
     private BottleMeshCoverageDisplay coverageDisplay;
     private string coverageError;
+    private RqfDisplay rqfDisplay;
+    private string rqfError;
     private ColmapCameraDisplay cameraDisplay;
     private string cameraError;
     private readonly ColmapImagePreview imagePreview = new ColmapImagePreview();
@@ -36,7 +38,10 @@ public class BottlePointCloudViewer : MonoBehaviour
         ? new Rect(15,15,Screen.width-365,Mathf.Max(1,Screen.height-30))
         : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
 
-    private Rect ControlPanelRect => new Rect(15,15,300,440);
+    private Rect ControlPanelRect => new Rect(15,15,300,Mathf.Min(
+        450 + (cameraDisplay != null && cameraDisplay.Visible ? 105 : 0) +
+        (currentMode == DisplayMode.MeshCoverage ? 105 : 0),Screen.height-30));
+    private Vector2 controlScroll;
     private Rect SelectionPanelRect => Screen.width >= 680
         ? new Rect(Screen.width-335,15,320,Mathf.Min(620,Screen.height-30))
         : new Rect(15,465,Mathf.Min(320,Screen.width-30),620);
@@ -52,7 +57,8 @@ public class BottlePointCloudViewer : MonoBehaviour
         ObservationCount,
         TriangulationAngle,
         Mesh,
-        MeshCoverage
+        MeshCoverage,
+        RQF
     }
 
     private DisplayMode currentMode = DisplayMode.Original;
@@ -103,6 +109,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (keyboard.escapeKey.wasPressedThisFrame)
         {
+            if(orbitCamera != null && orbitCamera.IsNextBestViewPreview) { orbitCamera.EndNextBestViewPreview(); return; }
             if(IsMatchedView)ReturnToOrbit();
             else
             {
@@ -116,6 +123,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     {
         Vector2 gui = new Vector2(screenPosition.x, Screen.height-screenPosition.y);
         return (!IsMatchedView && ControlPanelRect.Contains(gui)) ||
+            (rqfDisplay != null && rqfDisplay.Visible && rqfDisplay.Panel.Contains(gui)) ||
             (cameraDisplay != null && cameraDisplay.Visible && cameraDisplay.Selected != null && SelectionPanelRect.Contains(gui));
     }
 
@@ -150,6 +158,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void SetCamerasVisible(bool visible)
     {
+        if (visible && currentMode == DisplayMode.RQF) SetMode(DisplayMode.Mesh);
         if(IsMatchedView)ReturnToOrbit();
         if (cameraDisplay == null) cameraDisplay = new ColmapCameraDisplay();
         if (!cameraDisplay.TrySetVisible(transform, visible, out cameraError))
@@ -303,7 +312,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void SetMode(DisplayMode mode)
     {
-        bool showMesh = mode == DisplayMode.Mesh || mode == DisplayMode.MeshCoverage;
+        bool showMesh = mode == DisplayMode.Mesh || mode == DisplayMode.MeshCoverage || mode == DisplayMode.RQF;
         if (showMesh && bottleMesh == null)
         {
             Debug.LogWarning(
@@ -312,7 +321,25 @@ public class BottlePointCloudViewer : MonoBehaviour
             return;
         }
 
-        if (mode == DisplayMode.MeshCoverage)
+        if (currentMode == DisplayMode.RQF && mode != DisplayMode.RQF)
+            orbitCamera?.EndNextBestViewPreview();
+        coverageDisplay?.Restore();
+        rqfDisplay?.Restore();
+        coverageError = null;
+        if (mode == DisplayMode.RQF)
+        {
+            if (IsMatchedView) ReturnToOrbit();
+            SetCamerasVisible(false);
+            orbitCamera?.EndNextBestViewPreview();
+            if (rqfDisplay == null) rqfDisplay = new RqfDisplay();
+            if (!rqfDisplay.TryShow(bottleMesh, transform, out rqfError))
+            {
+                Debug.LogWarning(rqfError);
+                SetMode(DisplayMode.Mesh);
+                return;
+            }
+        }
+        else if (mode == DisplayMode.MeshCoverage)
         {
             if (coverageDisplay == null)
                 coverageDisplay = new BottleMeshCoverageDisplay();
@@ -321,11 +348,6 @@ public class BottlePointCloudViewer : MonoBehaviour
                 Debug.LogWarning(coverageError);
                 return;
             }
-        }
-        else
-        {
-            coverageDisplay?.Restore();
-            coverageError = null;
         }
 
         currentMode = mode;
@@ -358,6 +380,17 @@ public class BottlePointCloudViewer : MonoBehaviour
         Debug.Log("Display mode changed to: " + mode);
     }
 
+    void DrawModeButton(DisplayMode mode,string label)
+    {
+        bool selected=currentMode==mode;
+        Color previous=GUI.backgroundColor;
+        if(selected)GUI.backgroundColor=new Color(.35f,.80f,.86f);
+        var style=new GUIStyle(GUI.skin.button){fontStyle=selected?FontStyle.Bold:FontStyle.Normal};
+        if(GUILayout.Button(label,style,GUILayout.Height(28)))SetMode(mode);
+        GUI.backgroundColor=previous;
+        GUILayout.Space(3);
+    }
+
     void OnGUI()
     {
         if(IsMatchedView)
@@ -369,32 +402,34 @@ public class BottlePointCloudViewer : MonoBehaviour
             DrawSelectedCamera();
             return;
         }
-        GUILayout.BeginArea(
-            ControlPanelRect,
-            GUI.skin.box
-        );
+        GUILayout.BeginArea(ControlPanelRect,GUI.skin.box);
+        controlScroll = GUILayout.BeginScrollView(controlScroll);
 
-        GUILayout.Label("Bottle Visualization (keys 1-5)");
-
-        if (GUILayout.Button("Original Colors"))
-            SetMode(DisplayMode.Original);
-
-        if (GUILayout.Button("Observation Count"))
-            SetMode(DisplayMode.ObservationCount);
-
-        if (GUILayout.Button("Triangulation Angle"))
-            SetMode(DisplayMode.TriangulationAngle);
-
-        if (GUILayout.Button("3D Mesh"))
-            SetMode(DisplayMode.Mesh);
-
-        if (GUILayout.Button("Mesh Coverage"))
-            SetMode(DisplayMode.MeshCoverage);
+        GUILayout.Label("3D Reconstruction Explorer",new GUIStyle(GUI.skin.label){fontSize=18,fontStyle=FontStyle.Bold});
+        GUILayout.Space(10);
+        GUILayout.Label("Point cloud",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
+        DrawModeButton(DisplayMode.Original,"Original colors");
+        DrawModeButton(DisplayMode.ObservationCount,"Observation count");
+        DrawModeButton(DisplayMode.TriangulationAngle,"Triangulation angle");
+        GUILayout.Space(10);
+        GUILayout.Label("Surface",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
+        DrawModeButton(DisplayMode.Mesh,"3D mesh");
+        DrawModeButton(DisplayMode.MeshCoverage,"Mesh coverage");
+        GUILayout.Space(10);
+        GUILayout.Label("View planning",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
+        DrawModeButton(DisplayMode.RQF,"RQF filters + next-best-view");
+        if (!string.IsNullOrEmpty(rqfError)) GUILayout.Label(rqfError);
 
         bool showCameras = cameraDisplay != null && cameraDisplay.Visible;
         bool guiEnabled=GUI.enabled;
         if(IsMatchedView)GUI.enabled=false;
-        bool requested = GUILayout.Toggle(showCameras, "Show COLMAP cameras (C)");
+        Color cameraButtonBackground=GUI.backgroundColor;
+        if(showCameras)GUI.backgroundColor=new Color(.35f,.80f,.86f);
+        bool requested=showCameras;
+        var cameraButtonStyle=new GUIStyle(GUI.skin.button){fontStyle=showCameras?FontStyle.Bold:FontStyle.Normal};
+        if(GUILayout.Button("View all camera positions",cameraButtonStyle,GUILayout.Height(28)))
+            requested=!showCameras;
+        GUI.backgroundColor=cameraButtonBackground;
         GUI.enabled=guiEnabled;
         if (requested != showCameras) SetCamerasVisible(requested);
         if (cameraDisplay != null && cameraDisplay.Visible)
@@ -407,7 +442,6 @@ public class BottlePointCloudViewer : MonoBehaviour
         }
         if (!string.IsNullOrEmpty(cameraError)) GUILayout.Label(cameraError);
 
-        GUILayout.Label("Mode: " + currentMode);
 
         if (currentMode == DisplayMode.MeshCoverage && coverageDisplay != null)
         {
@@ -420,8 +454,10 @@ public class BottlePointCloudViewer : MonoBehaviour
         if (!string.IsNullOrEmpty(coverageError))
             GUILayout.Label(coverageError);
 
+        GUILayout.EndScrollView();
         GUILayout.EndArea();
         DrawSelectedCamera();
+        rqfDisplay?.Draw(orbitCamera);
     }
 
     void DrawSelectedCamera()
@@ -479,6 +515,9 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void OnDestroy()
     {
+        StopAllCoroutines();
+        orbitCamera?.EndNextBestViewPreview();
+        rqfDisplay?.Dispose();
         orbitCamera?.ReturnToOrbit();
         imagePreview.Dispose();
         cameraDisplay?.Dispose();

@@ -18,10 +18,40 @@ public class OrbitCamera : MonoBehaviour
     private bool dragging;
     private readonly ColmapMatchedView matchedView = new ColmapMatchedView();
     public bool IsMatchedView => matchedView.Active;
+    public bool IsNextBestViewPreview { get; private set; }
+    Vector3 nbvSavedPosition;
+    Quaternion nbvSavedRotation;
+    float nbvSavedFov, nbvSavedAspect;
+
+    public void PreviewNextBestView(Vector3 position, Quaternion rotation, float verticalFov)
+    {
+        if (IsMatchedView) ReturnToOrbit();
+        Camera camera = GetComponent<Camera>();
+        if (!IsNextBestViewPreview)
+        {
+            nbvSavedPosition = transform.position; nbvSavedRotation = transform.rotation;
+            nbvSavedFov = camera.fieldOfView; nbvSavedAspect = camera.aspect;
+        }
+        IsNextBestViewPreview = true;
+        transform.SetPositionAndRotation(position, rotation);
+        camera.fieldOfView = verticalFov;
+        // Use the current viewport aspect for the preview; planning uses a 4:3 sensor.
+        // The panel explicitly describes this as a preview, not a calibrated photo.
+    }
+
+    public void EndNextBestViewPreview()
+    {
+        if (!IsNextBestViewPreview) return;
+        transform.SetPositionAndRotation(nbvSavedPosition, nbvSavedRotation);
+        Camera camera = GetComponent<Camera>();
+        camera.fieldOfView = nbvSavedFov; camera.aspect = nbvSavedAspect;
+        IsNextBestViewPreview = false; allowOrbit = false; dragging = false;
+    }
 
     public bool TryViewCamera(ColmapCameraDisplay.CameraRecord record,Transform frame,int orientation,
                               Rect availablePixels,out string error)
     {
+        EndNextBestViewPreview();
         allowOrbit=false;dragging=false;
         return matchedView.TryEnter(GetComponent<Camera>(),frame,record,orientation,availablePixels,out error);
     }
@@ -43,6 +73,7 @@ public class OrbitCamera : MonoBehaviour
 
     void LateUpdate()
     {
+        if (IsNextBestViewPreview) return;
         if(IsMatchedView)
         {
             matchedView.Refresh(viewer!=null?viewer.MatchedViewArea:new Rect(0,0,Screen.width,Screen.height));
@@ -95,5 +126,5 @@ public class OrbitCamera : MonoBehaviour
         transform.LookAt(targetPosition);
     }
 
-    void OnDisable() { matchedView.Dispose(); }
+    void OnDisable() { EndNextBestViewPreview(); matchedView.Dispose(); }
 }
