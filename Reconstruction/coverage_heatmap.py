@@ -1,3 +1,4 @@
+# Visualize observation counts and report reprojection-error statistics for the filtered sparse cloud.
 
 from pathlib import Path
 import numpy as np
@@ -31,6 +32,7 @@ with open(BASE_DIR / "sparse_txt" / "points3D.txt") as f:
         track_lengths[point_id] = track_length
         reprojection_errors[point_id] = error
 
+# Match filtered cloud points to their COLMAP observation counts and reprojection errors.
 coverage = np.array([
     track_lengths[point_id] for point_id in point_ids
 ])
@@ -46,6 +48,7 @@ print(f"Mean observations: {coverage.mean():.2f}")
 print(f"Mean reprojection error: {errors.mean():.2f} px")
 
 # Color points by observation count
+# Display observation coverage as a point-cloud heatmap for manual inspection.
 fig = plt.figure(figsize=(10, 8))
 ax = fig.add_subplot(111, projection="3d")
 

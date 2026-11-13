@@ -1,3 +1,4 @@
+# Export an OBJ mesh using the same coordinate transform as the Unity point cloud.
 
 from pathlib import Path
 import json
@@ -19,6 +20,7 @@ center = np.array(transform["center"], dtype=float)
 scale = float(transform["scale"])
 axis_order = transform["axis_order"]
 
+# Align the source mesh with the Unity point cloud while preserving outward face orientation.
 mesh = trimesh.load(INPUT, force="mesh", process=False)
 
 # Apply the same COLMAP -> Unity transform as the point cloud.
@@ -32,6 +34,7 @@ mesh.vertices = vertices
 mesh.faces = mesh.faces[:, [0, 2, 1]]
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+# Write the aligned OBJ for import or inspection in Unity.
 mesh.export(OUTPUT)
 
 print(f"Exported: {OUTPUT}")

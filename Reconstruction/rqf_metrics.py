@@ -21,9 +21,11 @@ from scipy.spatial import cKDTree
 from scipy.special import expit
 from export_colmap_cameras import read_images, read_intrinsics
 
+# Names of the four need indicators and their combined RQF score.
 NAMES = ["coverage", "density", "edge", "texture", "rqf"]
 
 
+# Load point positions, optional normals and triangle connectivity from an OpenMVS PLY file.
 def read_ply(path):
     """Read binary little-endian OpenMVS PLY, including variable view lists."""
     scalar_types = {"float32": "f", "float": "f", "uint8": "B", "uchar": "B",
@@ -92,7 +94,9 @@ def read_ply(path):
     return vertices, normals, faces
 
 
+# Use the C++ raycaster to check which mesh surfaces a camera can see.
 class Raycaster:
+    # Prepare the raycasting library and build its spatial search structure for this mesh.
     def __init__(self, vertices, faces):
         if np.asarray(vertices).ndim != 2 or np.asarray(vertices).shape[1] != 3 or np.asarray(faces).ndim != 2 or np.asarray(faces).shape[1] != 3:
             raise ValueError("Expected triangle geometry")
@@ -117,6 +121,7 @@ class Raycaster:
         if not self.handle:
             raise RuntimeError("BVH construction failed")
 
+    # Return the distance to the first mesh intersection along each camera-to-target ray.
     def cast(self, origins, targets):
         targets = np.ascontiguousarray(targets, np.float64)
         origins = np.ascontiguousarray(np.broadcast_to(origins, targets.shape), np.float64)
@@ -124,16 +129,19 @@ class Raycaster:
         self.lib.rqf_bvh_cast(self.handle, origins.ctypes.data, targets.ctypes.data, len(targets), result.ctypes.data)
         return result
 
+    # Release the raycaster resources after analysis.
     def close(self):
         if self.handle:
             self.lib.rqf_bvh_destroy(self.handle)
             self.handle = None
 
 
+# Convert vectors to unit length while retaining their directions.
 def unit(values):
     return values / np.maximum(np.linalg.norm(values, axis=-1, keepdims=True), 1e-15)
 
 
+# Identify open mesh boundaries as potential signs of missing reconstructed surface.
 def boundary_vertices(vertices, faces):
     """Topological open boundaries on the existing OpenMVS mesh.
 
@@ -145,6 +153,7 @@ def boundary_vertices(vertices, faces):
     return np.unique(unique[counts == 1]), int(np.sum(counts > 2))
 
 
+# Find the closest surface location on each corresponding triangle.
 def closest_on_triangles(points, triangles):
     a, b, c = triangles[:, 0], triangles[:, 1], triangles[:, 2]
     ab, ac = b - a, c - a
@@ -168,6 +177,7 @@ def closest_on_triangles(points, triangles):
     return np.where(inside[:, None], projected, nearest)
 
 
+# Align sampled cloud points with nearby mesh surfaces and obtain their surface normals.
 def snap_to_mesh(points, vertices, faces):
     triangles = vertices[faces]
     _, choices = cKDTree(triangles.mean(axis=1)).query(points, k=min(16, len(faces)))
@@ -181,6 +191,7 @@ def snap_to_mesh(points, vertices, faces):
     return snapped, normals, face_ids
 
 
+# Project 3D points into a calibrated image and identify points within its bounds.
 def project(points, rotation, center, intrinsics):
     width, height, focal, cx, cy, radial = intrinsics
     xyz = (points - center) @ rotation.T
@@ -192,6 +203,7 @@ def project(points, rotation, center, intrinsics):
     return pixels, inside
 
 
+# Check whether eligible points face the camera and are not hidden by other mesh surfaces.
 def visible(points, normals, center, eligible, raycaster, scale):
     mask = eligible & (np.sum(normals * (center - points), axis=1) > 0)
     ids = np.flatnonzero(mask)
@@ -203,8 +215,8 @@ def visible(points, normals, center, eligible, raycaster, scale):
     return result
 
 
+# Estimate local image detail for the texture indicator using averaged gradient magnitudes.
 def gradient_patches(path, expected_size, max_side=1600, window=7):
-    # COLMAP uses stored pixel coordinates, not necessarily EXIF display orientation.
     with Image.open(path) as source:
         if source.size == expected_size:
             img = source.convert("L")
@@ -222,6 +234,7 @@ def gradient_patches(path, expected_size, max_side=1600, window=7):
     return uniform_filter(magnitude, size=window, mode="reflect"), np.array(size) / expected_size
 
 
+# Convert raw measurements into need values: lower measurements produce higher need.
 def poor_logistic(values, mean=None, std=None):
     values = np.asarray(values, float)
     valid = np.isfinite(values)
@@ -229,33 +242,35 @@ def poor_logistic(values, mean=None, std=None):
         return np.full_like(values, np.nan), {"mean": None, "std": None}
     mean = float(np.mean(values[valid])) if mean is None else float(mean)
     std = float(np.std(values[valid])) if std is None else float(std)
-    # Explicit handling of constant/degenerate input: neutral response.
     z = np.zeros_like(values) if std < 1e-12 else 2 * (values - mean) / std
     result = expit(-z)
     result[~valid] = np.nan
     return result, {"mean": mean, "std": std}
 
 
+# Combine the four normalized need indicators using the published RQF product formula.
 def combine_rqf(components, alpha=2):
     return np.prod((1 + alpha * np.asarray(components)) / (1 + alpha), axis=-1)
 
 
+# Reduce isolated need peaks by assigning the lowest value in each local neighborhood.
 def spatial_min(values, neighbors):
-    # Missing texture stays unknown at that sample. Ignore missing neighbors,
-    # but never manufacture a measured value for an unobserved sample.
     gathered = np.where(np.isfinite(values[neighbors]), values[neighbors], np.inf)
     result = gathered.min(axis=1)
     result[~np.isfinite(values)] = np.nan
     return result
 
 
+# Format a 3D vector for JSON export.
 def vec(v):
     return dict(zip(("x", "y", "z"), map(float, v)))
 
 
+# Run the offline analysis and export surface indicators and camera suggestions for Unity.
 def export(args):
     base = args.project / "Reconstruction/bottle"
     out = args.project / "Assets/PhotoObjectLab/Resources"
+    # Load the existing reconstruction and select cloud points close to its mesh.
     print("Loading OpenMVS mesh and dense cloud...", flush=True)
     vertices, _, faces = read_ply(base / "openmvs/scene_dense_mesh.ply")
     dense, _, _ = read_ply(base / "openmvs/scene_dense.ply")
@@ -263,12 +278,12 @@ def export(args):
         raise ValueError("No mesh triangles")
     extent = float(np.max(np.ptp(vertices, axis=0)))
     diagonal = float(np.linalg.norm(np.ptp(vertices, axis=0)))
-    # Remove background points remote from the object mesh before density queries.
     mesh_tree = cKDTree(vertices)
     dense_distance = mesh_tree.query(dense, workers=1)[0]
     dense = dense[dense_distance <= extent * .01]
     if len(dense) < 100:
         raise ValueError("Too few dense points near bottle mesh")
+    # Select a reproducible subset and align it with the mesh for further analysis.
     selected = np.sort(np.random.default_rng(42).choice(len(dense), min(args.samples, len(dense)), replace=False))
     original_points = dense[selected]
     points, normals, face_ids = snap_to_mesh(original_points, vertices, faces)
@@ -277,14 +292,15 @@ def export(args):
     points, normals, original_points = points[valid], normals[valid], original_points[valid]
     if len(points) < 100:
         raise ValueError("Too few aligned dense samples")
+    # Measure local density in the full filtered cloud and distance to open boundaries.
     dense_tree = cKDTree(dense)
     spacing = dense_tree.query(dense, k=2, workers=1)[0][:, 1]
     spacing = spacing[spacing > 0]
-    # Local support radius is an explicit implementation parameter.
     density_radius = float(args.density_radius or 10 * np.mean(spacing))
     density = dense_tree.query_ball_point(original_points, density_radius, return_length=True, workers=1).astype(float)
     borders, nonmanifold = boundary_vertices(vertices, faces)
     edge_distance = cKDTree(vertices[borders]).query(points)[0] if len(borders) else np.full(len(points), np.inf)
+    # Load calibrated camera poses and prepare per-point visibility and texture measurements.
     cameras = read_images(base / "sparse_txt/images.txt")
     intrinsics = read_intrinsics(base / "sparse_txt/cameras.txt")
     visibility = np.zeros((len(points), len(cameras)), bool)
@@ -292,6 +308,7 @@ def export(args):
     raycaster = Raycaster(vertices, faces)
     image_fingerprints = []
     try:
+        # Inspect each original image to determine visible points and their local image detail.
         for j, (_, camera_id, name, rotation, center) in enumerate(cameras):
             calibration = intrinsics[camera_id]
             pixels, inside = project(points, rotation, center, calibration)
@@ -309,6 +326,7 @@ def export(args):
             saliency_n[ids] += 1
             image_fingerprints.append({"name": name, "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
             print(f"Camera {j+1}/{len(cameras)}: {seen.sum()} visible samples", flush=True)
+        # Summarize camera coverage and texture, then calculate normalized need indicators.
         counts = visibility.sum(axis=1)
         saliency = np.divide(saliency_sum, saliency_n, out=np.full(len(points), np.nan), where=saliency_n > 0)
         neighbors = cKDTree(points).query(points, k=min(args.neighbors, len(points)))[1]
@@ -321,12 +339,13 @@ def export(args):
         else:
             edge_norm, edge_params = np.zeros(len(points)), {"mean": None, "std": None}
         texture_norm, texture_params = poor_logistic(saliency)
+        # Aggregate each indicator locally before combining them into one RQF score per point.
         components = np.column_stack([spatial_min(x, neighbors) for x in
                                       (coverage_norm, density_norm, edge_norm, texture_norm)])
         rqf = combine_rqf(components)
         values = np.column_stack([components, rqf])
-        # Simple paper-style view planning: highest-need point, face it along its
-        # normal at a fixed working distance. No invented sum over candidates.
+        # Generate spaced camera suggestions aimed at high-RQF targets along their normals.
+        # Rank by target need, not by predicted improvement over the entire camera image.
         centers = np.array([c[4] for c in cameras])
         working_distance = float(args.working_distance or np.median(np.linalg.norm(centers - vertices.mean(axis=0), axis=1)))
         proposals = []
@@ -349,6 +368,7 @@ def export(args):
         raycaster.close()
     if not proposals:
         raise ValueError("No visibility-validated RQF camera proposals")
+    # Convert geometry to Unity coordinates and transfer sample values to the display mesh.
     transform = json.loads((base / "unity_transform.json").read_text())
     center, scale, order = np.array(transform["center"]), float(transform["scale"]), transform["axis_order"]
     to_unity = lambda p: ((p - center) * scale)[..., order]
@@ -372,6 +392,7 @@ def export(args):
     sample_export = np.column_stack([to_unity(points), normals[:, order], values,
                                      counts, density, edge_distance * scale, saliency])
     sample_export = np.where(np.isfinite(sample_export), sample_export, -1)
+    # Export Unity data, ranked camera suggestions and analysis results for inspection.
     out.mkdir(parents=True, exist_ok=True)
     header = struct.pack("<4s4I", b"RQF1", 1, len(vertices), len(points), len(cameras))
     binary = header + to_unity(vertices).astype("<f4").tobytes() + mapped.astype("<f4").tobytes() + sample_export.astype("<f4").tobytes()
@@ -381,6 +402,7 @@ def export(args):
     (out / "BottleRQFViews.json").write_text(json.dumps({"version": 1, "proposals": poses}, indent=2))
     np.savez_compressed(base / "rqf_analysis.npz", points=points, normals=normals, values=values,
                         counts=counts, density=density, edge_distance=edge_distance, saliency=saliency, visibility=visibility)
+    # Record the inputs, settings, results and adaptations needed to interpret this export.
     report = {
         "method": "RQF (Neumann et al., 2025), sampled OpenMVS adaptation", "doi": "10.1007/s11042-025-20596-6",
         "alpha": 2, "samples": len(points), "registered_cameras": len(cameras), "dense_points_near_mesh": len(dense),
@@ -404,6 +426,7 @@ def export(args):
     print(json.dumps({k: v for k, v in report.items() if k not in ["image_fingerprints", "adaptations"]}, indent=2), flush=True)
 
 
+# Read command-line settings and start the analysis when this file is run directly.
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parent.parent)

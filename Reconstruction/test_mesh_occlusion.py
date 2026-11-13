@@ -1,3 +1,4 @@
+# Inspect occlusion filtering on saved mesh samples and a subset of registered cameras.
 
 from pathlib import Path
 import numpy as np
@@ -85,6 +86,7 @@ def test_occlusion(mesh, points, face_indices, camera, candidates):
 
 
 
+# Compare visibility before and after occlusion checks on a small saved sample set.
 def main():
     print("Loading mesh...")
 

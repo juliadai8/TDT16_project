@@ -1,3 +1,4 @@
+# Interactively crop the sparse COLMAP cloud and save the selected points for later analysis.
 
 from pathlib import Path
 import numpy as np
@@ -79,6 +80,7 @@ for i, name in enumerate(["X", "Y", "Z"]):
     sliders.append(slider)
 
 
+# Select points inside the coordinate ranges currently chosen with the sliders.
 def get_mask():
     mask = np.ones(len(points), dtype=bool)
 
@@ -89,6 +91,7 @@ def get_mask():
     return mask
 
 
+# Refresh the point-cloud preview whenever the selected crop changes.
 def update(_=None):
     mask = get_mask()
 
@@ -122,6 +125,7 @@ def update(_=None):
     fig.canvas.draw_idle()
 
 
+# Connect crop controls to the preview before opening the interactive window.
 for slider in sliders:
     slider.on_changed(update)
 
@@ -131,6 +135,7 @@ plt.show()
 
 
 # Save the filtered point cloud after closing the plot
+# Save the selected cloud after the interactive window closes.
 mask = get_mask()
 
 filtered_points = points[mask]

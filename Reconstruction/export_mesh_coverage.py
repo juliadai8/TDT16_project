@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 import trimesh
 
 
+# Assign each mesh vertex the coverage of a nearby sample with a compatible surface normal.
 def transfer_counts(vertices, vertex_normals, points, normals, counts):
     if len(points) < 2:
         raise ValueError("At least two surface samples are required.")
@@ -33,6 +34,7 @@ def transfer_counts(vertices, vertex_normals, points, normals, counts):
     return values, radius
 
 
+# Map coverage counts to a red-to-green palette, marking unavailable values in gray.
 def colorize(values, max_count):
     t = np.clip(values / max(max_count, 1), 0, 1)
     low = np.array([215, 48, 39.0])
@@ -46,6 +48,7 @@ def colorize(values, max_count):
                             np.full(len(values), 255, dtype=np.uint8)])
 
 
+# Validate saved visibility samples against the mesh and export the coverage display data.
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path,

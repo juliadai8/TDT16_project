@@ -1,3 +1,4 @@
+# Export the OpenMVS mesh as aligned binary geometry for the Unity mesh importer.
 
 from pathlib import Path
 import json
@@ -21,6 +22,7 @@ center = np.array(transform["center"], dtype=np.float64)
 scale = float(transform["scale"])
 axis_order = transform["axis_order"]
 
+# Load the source mesh and align its geometry with the existing Unity point-cloud coordinates.
 mesh = trimesh.load(input_file, force="mesh", process=False)
 
 # Exactly the same transformation as bottle_unity.csv
@@ -35,6 +37,7 @@ faces = faces[:, [0, 2, 1]].astype("<u4")
 
 output_file.parent.mkdir(parents=True, exist_ok=True)
 
+# Save geometry in the binary format consumed by BottleMeshImporter.cs.
 with open(output_file, "wb") as f:
     f.write(struct.pack("<II", len(vertices), len(faces)))
     f.write(vertices.tobytes())

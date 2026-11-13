@@ -1,3 +1,4 @@
+# Validate COLMAP pose parsing, calibrated camera geometry and exported camera positions.
 import json
 from pathlib import Path
 import tempfile
@@ -6,7 +7,9 @@ import numpy as np
 from export_colmap_cameras import read_images, rotation, corner_rays
 
 
+# Group checks for camera parsing, calibration and Unity coordinate alignment.
 class CameraPoseTests(unittest.TestCase):
+    # Check that an empty observations line does not cause a registered camera to be skipped.
     def test_empty_observation_line_does_not_skip_next_pose(self):
         with tempfile.TemporaryDirectory() as directory:
             file = Path(directory) / "images.txt"
@@ -15,6 +18,7 @@ class CameraPoseTests(unittest.TestCase):
             self.assertEqual(len(poses), 2)
             np.testing.assert_allclose(poses[0][4], [-1, -2, -3])
 
+    # Check camera-pose inversion and the image-corner rays derived from lens calibration.
     def test_pose_inverse_and_lens_corner_projection(self):
         R = rotation([.7, .2, -.3, .6])
         t = np.array([1., 2., 3.])
@@ -27,6 +31,7 @@ class CameraPoseTests(unittest.TestCase):
         uv = x * (1+intrinsics[-1]*np.sum(x*x, axis=1))[:, None] * intrinsics[2] + intrinsics[3:5]
         np.testing.assert_allclose(uv, [[0, 0], [4032, 0], [4032, 3024], [0, 3024]], atol=1e-8)
 
+    # Check that exported Unity poses agree with the saved visibility-analysis camera poses.
     def test_exported_positions_match_visibility_cameras(self):
         project = Path(__file__).resolve().parent.parent
         if not (project / 'Reconstruction').exists():

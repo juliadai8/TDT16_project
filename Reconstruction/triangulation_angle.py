@@ -1,3 +1,4 @@
+# Estimate each sparse point's triangulation geometry from its observing cameras.
 
 from pathlib import Path
 import numpy as np
@@ -18,6 +19,7 @@ def quaternion_to_rotation(q):
     ])
 
 
+# Recover world-space camera centers from the registered COLMAP image poses.
 def read_camera_positions(path):
     cameras = {}
 
@@ -47,6 +49,7 @@ def read_camera_positions(path):
     return cameras
 
 
+# Identify which registered images observed each sparse COLMAP point.
 def read_point_tracks(path):
     tracks = {}
 

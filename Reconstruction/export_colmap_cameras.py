@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 
 
+# Convert a COLMAP quaternion into a validated world-to-camera rotation matrix.
 def rotation(q):
     q = np.asarray(q, dtype=float)
     if not np.isfinite(q).all() or np.linalg.norm(q) < 1e-12:
@@ -16,6 +17,7 @@ def rotation(q):
         [2*(x*z-y*w), 2*(y*z+x*w), 1-2*(x*x+y*y)]])
 
 
+# Read registered image identities, orientations and camera centers from COLMAP text data.
 def read_images(path):
     # Consume the observation line even if it is empty: image records have two lines.
     cameras = []
@@ -36,6 +38,7 @@ def read_images(path):
     return cameras
 
 
+# Read the supported camera calibration parameters used for projection and camera markers.
 def read_intrinsics(path):
     result = {}
     for line in path.read_text().splitlines():
@@ -48,6 +51,7 @@ def read_intrinsics(path):
     return result
 
 
+# Recover camera-space rays through the image corners, accounting for radial lens distortion.
 def corner_rays(intrinsics):
     width, height, f, cx, cy, k = intrinsics
     if f <= 0:
@@ -61,6 +65,7 @@ def corner_rays(intrinsics):
     return np.column_stack([distorted * factor[:, None], np.ones(4)])
 
 
+# Transform calibrated camera poses into Unity coordinates and save their markers and intrinsics.
 def export(project, output):
     base = project / "Reconstruction" / "bottle"
     transform = json.loads((base / "unity_transform.json").read_text())
@@ -76,6 +81,7 @@ def export(project, output):
     # Compact display markers. Their locations and directions remain the actual poses.
     depth = max(float(np.median([np.linalg.norm(c[4]-center) for c in cameras])) * .055, 1e-5)
 
+    # Convert a reconstruction-space position into a Unity vector for JSON export.
     def vector(p):
         p = np.asarray(p)
         if not np.isfinite(p).all():

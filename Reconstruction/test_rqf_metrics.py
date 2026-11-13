@@ -13,13 +13,16 @@ from rqf_metrics import (Raycaster, boundary_vertices, closest_on_triangles,
 PROJECT = Path(__file__).resolve().parent.parent
 
 
+# Group analytic geometry, metric and real-export consistency checks.
 class RqfTests(unittest.TestCase):
+    # Check the RQF formula against known values and its handling of unknown components.
     def test_published_combination(self):
         self.assertAlmostEqual(float(combine_rqf([0, 0, 0, 0])), 1 / 81)
         self.assertEqual(float(combine_rqf([1, 1, 1, 1])), 1)
         self.assertAlmostEqual(float(combine_rqf([0, .5, 1, .25])), 1 / 9)
         self.assertTrue(np.isnan(combine_rqf([0, np.nan, 0, 0])))
 
+    # Check normalization direction, reference values and unknown or constant inputs.
     def test_logistic_need_and_unknown(self):
         v, parameters = poor_logistic([0, 20, 50, np.nan], 20, 7)
         self.assertGreater(v[0], .99)
@@ -30,12 +33,14 @@ class RqfTests(unittest.TestCase):
         constant, _ = poor_logistic([7, 7])
         np.testing.assert_array_equal(constant, [.5, .5])
 
+    # Check local minimum aggregation without inventing values for unknown samples.
     def test_spatial_min_retains_unknown(self):
         values = np.array([.9, .2, np.nan])
         result = spatial_min(values, np.array([[0, 1], [1, 2], [2, 0]]))
         np.testing.assert_allclose(result[:2], [.2, .2])
         self.assertTrue(np.isnan(result[2]))
 
+    # Check open-edge identification and nearest-surface point calculations.
     def test_open_boundaries_and_surface_snap(self):
         vertices = np.array([[0,0,0], [1,0,0], [1,1,0], [0,1,0]], float)
         faces = np.array([[0,1,2], [0,2,3]])
@@ -46,6 +51,7 @@ class RqfTests(unittest.TestCase):
         np.testing.assert_allclose(closest_on_triangles(np.array([[.2,.2,1]]), triangle), [[.2,.2,0]])
         np.testing.assert_allclose(closest_on_triangles(np.array([[2,0,1]]), triangle), [[1,0,0]])
 
+    # Check that open geometry has boundary vertices while a closed tetrahedron does not.
     def test_topological_boundaries_distinguish_open_fan_and_closed_tetrahedron(self):
         # Flat interior has a full 360-degree fan and must not be classified.
         vertices = np.array([[0,0,0],[1,0,0],[0,1,0],[-1,0,0],[0,-1,0]],float)
@@ -56,6 +62,7 @@ class RqfTests(unittest.TestCase):
         tetra_faces = np.array([[0,2,1],[0,1,3],[1,2,3],[2,0,3]])
         self.assertEqual(len(boundary_vertices(tetra_vertices,tetra_faces)[0]),0)
 
+    # Check that foreground geometry hides rear samples and that missed rays do not count as visible.
     def test_ray_occlusion_and_visible_mask(self):
         # Two aligned triangles: the rear sample must be occluded.
         vertices = np.array([[-1,-1,1],[1,-1,1],[0,1,1],[-1,-1,2],[1,-1,2],[0,1,2]],float)
@@ -71,6 +78,7 @@ class RqfTests(unittest.TestCase):
         finally:
             caster.close()
 
+    # Check image projection and the difference between flat and textured image patches.
     def test_pixel_projection_and_texture_gradient(self):
         pixels, mask = project(np.array([[0,0,2],[2,0,2],[0,0,-1]]),np.eye(3),np.zeros(3),(100,80,50,50,40,0))
         np.testing.assert_allclose(pixels[0],[50,40])
@@ -85,6 +93,7 @@ class RqfTests(unittest.TestCase):
             self.assertGreater(float(textured.mean()),.05)
             np.testing.assert_array_equal(ratio,[1,1])
 
+    # Check reading PLY vertices with additional variable-length observation lists.
     def test_openmvs_ply_lists(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/'points.ply'
@@ -94,6 +103,7 @@ class RqfTests(unittest.TestCase):
             np.testing.assert_array_equal(v,[[1,2,3]])
             self.assertIsNone(n);self.assertIsNone(f)
 
+    # Check that the supplied Unity export, metric values and camera proposals agree.
     def test_real_export_contract(self):
         resources=PROJECT/'Assets/PhotoObjectLab/Resources'
         data=(resources/'BottleRQF.bytes').read_bytes()

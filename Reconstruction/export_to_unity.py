@@ -1,3 +1,4 @@
+# Combine sparse-cloud colors, observation counts and triangulation angles into a Unity CSV export.
 
 from pathlib import Path
 import csv
@@ -20,6 +21,7 @@ angle_data = np.load(
 )
 
 # Match angles to original COLMAP point IDs
+# Join triangulation results to the filtered cloud by their original COLMAP point IDs.
 angle_lookup = dict(zip(
     angle_data["point_ids"].astype(int),
     angle_data["triangulation_angles"]
@@ -31,6 +33,7 @@ angles = np.array([
 ])
 
 # Load observation counts from COLMAP
+# Read observation support from the sparse reconstruction for each point.
 observation_counts = {}
 
 with open(BASE_DIR / "sparse_txt" / "points3D.txt") as f:
@@ -50,6 +53,7 @@ counts = np.array([
 ])
 
 # Center and scale points
+# Choose a shared coordinate transform for the cloud, mesh and camera exports.
 center = points.mean(axis=0)
 scale = 2.0 / np.max(np.ptp(points, axis=0))
 
@@ -59,6 +63,7 @@ scaled = (points - center) * scale
 unity_points = scaled[:, [0, 2, 1]]
 
 # Generate heatmap colors
+# Create display colors for observation counts and triangulation angles.
 cmap = plt.get_cmap("RdYlGn")
 
 count_low, count_high = np.percentile(counts, [5, 95])
@@ -87,6 +92,7 @@ angle_colors = cmap(
 # Export CSV for Unity
 output_file = BASE_DIR / "bottle_unity.csv"
 
+# Write the point positions, display colors and diagnostic values read by Unity.
 with open(output_file, "w", newline="") as f:
     writer = csv.writer(f)
 

@@ -1,3 +1,4 @@
+# Measure surface visibility across registered cameras, including occlusion, and save coverage samples.
 
 from pathlib import Path
 import numpy as np
@@ -242,6 +243,7 @@ def check_occlusion(mesh, points, camera, candidates, batch_size=5):
 
 
 
+# Sample the mesh, evaluate visibility across the registered cameras and save coverage results.
 def main():
     print("Loading mesh and COLMAP cameras...", flush=True)
 
