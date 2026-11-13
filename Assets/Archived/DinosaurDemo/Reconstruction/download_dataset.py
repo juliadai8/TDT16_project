@@ -6,7 +6,8 @@ import shutil
 import tempfile
 
 URL = "https://vision.middlebury.edu/mview/data/data/dinoRing.zip"
-DEST = Path(__file__).resolve().parent / "data" / "dinoRing"
+# Keep downloaded inputs outside Assets so Unity does not import the full dataset.
+DEST = Path(__file__).resolve().parents[4] / "Reconstruction" / "data" / "dinoRing"
 
 
 def main():

@@ -1,45 +1,104 @@
-# Photo reconstruction and volume prototype
+# 3D Reconstruction Explorer
 
-A Unity desktop prototype for exploring a reconstructed object as a solid mesh or point cloud, viewing example input photos, and estimating enclosed volume after setting a known reference distance.
+A Unity desktop learning prototype for exploring a bottle reconstructed from
+photographs with COLMAP and OpenMVS. It connects camera positions, point-cloud
+diagnostics and surface need indicators to an explainable next-best-view suggestion.
 
 ## Open the prototype
 
-1. Open this repository in Unity Hub with Unity **6000.6.7f1**.
-2. Open `Assets/PhotoObjectLab/DinosaurPhotoDemo.unity` and press **Play**.
-3. Right-drag to orbit and scroll to zoom. The controls appear inside the Game view during Play mode.
+1. Open the project in Unity Hub with Unity **6000.6.7f1**.
+2. Open `Assets/PhotoObjectLab/BottleVisualization.unity`.
+3. Press **Play**. Left-drag outside the panels to orbit and scroll to zoom.
 
-The left panel switches solid/point views and browses six example source photographs. Reconstruction used **43 of the 48 input photos**, selected by the dataset's supplied good-silhouette list. The six displayed previews do not limit reconstruction.
+The bottle scene is the only enabled scene in Build Settings. The archived
+dinosaur scene is retained in the project but is not included in the scene list.
 
-To calibrate volume, choose two surface points, enter their known separation in centimetres, and apply it. The demo scale is illustrative. Without a verified reference length, volume is reported in dataset units cubed.
+The supplied mesh and precomputed analysis data can be viewed without Python,
+COLMAP or OpenMVS installed. Original-photo previews require the corresponding
+image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COLMAP_CAMERAS_README.txt).
 
-If needed, use **Tools > Photo Object > Create Dinosaur Scene** to generate a fresh scene. **Tools > Photo Object > Run Volume Checks** checks a tetrahedron, cubic scaling, rejection of an open mesh, and the imported dinosaur's topology and volume.
+## Explore the reconstruction
 
-## Reconstruction
+- **Original colors:** the sparse point cloud with its reconstructed colors.
+- **Observation count:** the number of image observations supporting each sparse point.
+- **Triangulation angle:** the camera geometry supporting each sparse point.
+- **3D mesh:** the reconstructed surface.
+- **Mesh coverage:** approximate surface coverage from geometrically visible cameras.
+- **RQF filters + next-best-view:** individual surface need indicators, their
+  combined score and a suggested camera position aimed at a high-priority target.
+- **View all camera positions:** inspect the registered cameras and select one
+  to examine its source image and view the reconstruction from that camera.
 
-The bottle scene includes **RQF filters + next-best-view**, a sampled OpenMVS
-adaptation of Neumann et al. (2025). Open
-`Assets/PhotoObjectLab/BottleVisualization.unity`, enter Play mode, and select
-that button to explore four reconstruction need filters, their combined RQF
-metric and one recommended camera at a time. It uses all 73 calibrated photos.
-See [RQF.md](RQF.md) for the published formula, adaptations, generation command
-and validation.
+Keys **1–5** select the first five views. **C** toggles camera positions.
+**Esc** exits a camera preview or clears a camera selection, depending on the current view.
 
-`Reconstruction/` contains the Python pipeline, dependency list, source attribution, and dataset downloader. See its README to reproduce the model. Python is optional for running the supplied Unity viewer.
+## RQF-based camera suggestions
 
-The prototype uses a calibrated silhouette **visual hull**, with camera positions and orientations supplied by the Middlebury DinoRing dataset. It does not yet estimate camera poses from arbitrary phone photos. The object includes its integrated pedestal; the pedestal is included in volume. Silhouettes cannot recover hidden concavities, and a closed mesh does not establish measurement accuracy.
+The method is a **sampled OpenMVS adaptation** of Neumann et al. (2025),
+*Point cloud quality metrics for incremental image-based 3D reconstruction*:
+https://doi.org/10.1007/s11042-025-20596-6
 
-The reconstructed mesh has 108,457 vertices and 217,042 triangles. Volume is approximately 0.0001032257531 dataset units cubed. Changing grid resolution from 112 to 176 changed volume by about 0.41%; this is sensitivity to resolution, not an accuracy bound.
+It combines camera coverage, local point density, distance to open reconstruction
+edges and image-gradient-based texture information using the published RQF formula
+with alpha = 2. The supplied export analyzes 4,799 samples using 73 calibrated photos.
+Camera proposals target high-RQF points and are placed along their surface normals.
 
-## Project contents
+Our boundary detection uses topologically open edges on the existing OpenMVS mesh,
+rather than the paper's angle-sum criterion on a new Poisson mesh. Other sampling,
+visibility and parameter choices are documented in [RQF.md](RQF.md).
 
-- `Assets/PhotoObjectLab`: viewer, measurement code, point shader, reconstructed mesh, report, scene, and six photo previews.
-- `Packages` and `ProjectSettings`: Unity dependencies and configuration.
-- `Reconstruction`: reproducible reconstruction pipeline; raw inputs and generated outputs are ignored by Git.
+**Preview camera** shows the proposed view; **Next suggestion** browses the ranked
+proposals. Neither action captures an image, updates the reconstruction or simulates
+an improvement. The cyan overlay shows visible samples near the target, not predicted gain.
 
-Unity caches, local builds, and installed Python dependencies are excluded. Model and image files use Git LFS; clone with Git LFS installed and run `git lfs pull` if they appear as pointer files.
+These indicators describe potential acquisition need, not measured geometric error.
+Reflections, incorrect but dense geometry and inaccessible surfaces can produce
+misleading priorities. The prototype does not implement automatic photography,
+incremental reconstruction, physical camera guidance, VR or AR interaction.
 
-## Source attribution
+## Code and data
 
-Photos and calibration: [Middlebury Multi-View Stereo, DinoRing](https://vision.middlebury.edu/mview/data/), created by Steve Seitz, James Diebel, Daniel Scharstein, Brian Curless, and Rick Szeliski. The mesh was reconstructed from these images, not downloaded as a finished benchmark model. Original dataset notes are preserved in `Reconstruction/DATASET_README.txt`. Dataset content retains its original terms; this repository does not grant a new licence to it.
+| Location | Purpose |
+| --- | --- |
+| `Assets/PhotoObjectLab/` | Active bottle scene, viewer scripts and display shaders |
+| `Assets/PhotoObjectLab/Data/` | Bottle mesh and material |
+| `Assets/PhotoObjectLab/Resources/` | Precomputed point-cloud, camera, coverage and RQF data |
+| `Assets/PhotoObjectLab/Editor/` | Mesh import and validation tools |
+| `Reconstruction/rqf_metrics.py` | Offline metric calculation and camera proposal export |
+| `Reconstruction/rqf_raycast.cpp` | Mesh visibility raycaster used by the Python pipeline |
+| `Reconstruction/` | Bottle preprocessing, export tools, tests and offline data |
+| `Assets/Archived/DinosaurDemo/` | Earlier dinosaur scene, scripts, data, photos and documentation |
+| `Packages/`, `ProjectSettings/` | Unity dependencies and project configuration |
 
-This is a desktop prototype. Phone AR and XR interaction are not implemented.
+The main RQF implementation, generation command and required inputs are described
+in [RQF.md](RQF.md). [archived reconstruction guide](Assets/Archived/DinosaurDemo/Reconstruction/README.md) documents
+reproduction of the older dinosaur experiment, not the bottle reconstruction.
+
+## Validation
+
+With the dependencies described in RQF.md installed, run the RQF checks from the project root:
+
+```sh
+python3 -m unittest discover -s Reconstruction -p test_rqf_metrics.py -v
+```
+
+In Unity, open the bottle scene and use **Tools > Bottle > Validate RQF**,
+**Validate Mesh Coverage** or **Validate COLMAP Cameras** for the corresponding checks.
+
+## Archived experiment and attribution
+
+The earlier dinosaur prototype is preserved at
+`Assets/Archived/DinosaurDemo/DinosaurPhotoDemo.unity` with its own
+[usage notes](Assets/Archived/DinosaurDemo/README.txt).
+It reconstructs a calibrated silhouette visual hull and demonstrates volume
+measurement. Those features and results belong to that experiment, not the bottle viewer.
+
+Its source photos and calibration come from the
+[Middlebury DinoRing dataset](https://vision.middlebury.edu/mview/data/), created by
+Steve Seitz, James Diebel, Daniel Scharstein, Brian Curless and Rick Szeliski.
+Original notes are preserved in `Assets/Archived/DinosaurDemo/Reconstruction/DATASET_README.txt`; dataset content
+retains its original terms.
+
+Unity caches, local builds and raw reconstruction inputs are excluded according
+to the repository's ignore rules. Some assets use Git LFS; if a model or image is
+a pointer file after cloning, install Git LFS and run `git lfs pull`.

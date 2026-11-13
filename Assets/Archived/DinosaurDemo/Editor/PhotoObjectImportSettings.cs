@@ -6,7 +6,7 @@ namespace TDT16.PhotoObjects
     {
         void OnPreprocessModel()
         {
-            if(!assetPath.StartsWith("Assets/PhotoObjectLab/Data/Dinosaur")) return;
+            if(!assetPath.StartsWith("Assets/Archived/DinosaurDemo/Data/Dinosaur")) return;
             ModelImporter importer=(ModelImporter)assetImporter;
             importer.isReadable=true;
             importer.globalScale=1;

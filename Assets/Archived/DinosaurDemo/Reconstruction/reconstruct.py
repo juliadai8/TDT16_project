@@ -5,7 +5,8 @@ calibration is supplied by the dataset, not estimated by this script.
 """
 import sys
 from pathlib import Path
-ROOT = Path(__file__).resolve().parent
+# Preserve the existing input/output locations outside Unity's imported Assets tree.
+ROOT = Path(__file__).resolve().parents[4] / "Reconstruction"
 sys.path.insert(0, str(ROOT / "deps"))
 import json
 import numpy as np

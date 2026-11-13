@@ -12,17 +12,17 @@ namespace TDT16.PhotoObjects
         public static void CreateScene()
         {
             if(!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
-            GameObject asset=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/PhotoObjectLab/Data/DinosaurReconstructed.obj");
+            GameObject asset=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Archived/DinosaurDemo/Data/DinosaurReconstructed.obj");
             if(asset==null){Debug.LogError("Dinosaur OBJ has not finished importing.");return;}
             MeshFilter filter=asset.GetComponentInChildren<MeshFilter>();
             if(filter==null){Debug.LogError("No mesh found in dinosaur OBJ.");return;}
-            string path=AssetDatabase.GenerateUniqueAssetPath("Assets/PhotoObjectLab/DinosaurPhotoDemo.unity");
+            string path=AssetDatabase.GenerateUniqueAssetPath("Assets/Archived/DinosaurDemo/DinosaurPhotoDemo.unity");
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
             PhotoObjectViewer viewer=new GameObject("Photo Object Lab").AddComponent<PhotoObjectViewer>();
             viewer.reconstructedMesh=filter.sharedMesh;
-            viewer.reconstructionReport=AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/PhotoObjectLab/Data/reconstruction_report.json");
+            viewer.reconstructionReport=AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Archived/DinosaurDemo/Data/reconstruction_report.json");
             viewer.pointShader=Shader.Find("TDT16/Photo Object Points");
-            string[] ids=AssetDatabase.FindAssets("t:Texture2D",new[]{"Assets/PhotoObjectLab/Photos"});
+            string[] ids=AssetDatabase.FindAssets("t:Texture2D",new[]{"Assets/Archived/DinosaurDemo/Photos"});
             Array.Sort(ids,(a,b)=>string.CompareOrdinal(AssetDatabase.GUIDToAssetPath(a),AssetDatabase.GUIDToAssetPath(b)));
             viewer.sourcePhotos=new Texture2D[ids.Length];
             for(int i=0;i<ids.Length;i++)viewer.sourcePhotos[i]=AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(ids[i]));
@@ -47,11 +47,11 @@ namespace TDT16.PhotoObjects
                 mesh.triangles=new[]{0,2,1,0,1,3,0,3,2};
                 MeshMeasurements.Volume(mesh,out closed);
                 if(closed)throw new Exception("Open mesh must fail the closed-edge check.");
-                GameObject asset=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/PhotoObjectLab/Data/DinosaurReconstructed.obj");
+                GameObject asset=AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Archived/DinosaurDemo/Data/DinosaurReconstructed.obj");
                 Mesh dino=asset.GetComponentInChildren<MeshFilter>().sharedMesh;
                 volume=MeshMeasurements.Volume(dino,out closed);
                 if(!closed || volume<=0)throw new Exception("Imported dinosaur failed topology/volume check.");
-                TextAsset json=AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/PhotoObjectLab/Data/reconstruction_report.json");
+                TextAsset json=AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Archived/DinosaurDemo/Data/reconstruction_report.json");
                 double expected=JsonUtility.FromJson<MeasurementReport>(json.text).volume_dataset_units_cubed;
                 if(Math.Abs(volume-expected)/expected>0.0001)throw new Exception("Unity mesh volume differs from reconstruction output; check import scale and mesh splitting.");
                 Debug.Log("Photo Object: ALL 4 VOLUME CHECKS PASSED. Dinosaur volume: "+volume.ToString("G12")+" dataset units cubed.");
