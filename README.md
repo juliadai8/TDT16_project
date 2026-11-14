@@ -23,13 +23,12 @@ image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COL
 - **Observation count:** the number of image observations supporting each sparse point.
 - **Triangulation angle:** the camera geometry supporting each sparse point.
 - **3D mesh:** the reconstructed surface.
-- **Mesh coverage:** approximate surface coverage from geometrically visible cameras.
 - **RQF filters + next-best-view:** individual surface need indicators, their
   combined score and a suggested camera position aimed at a high-priority target.
 - **View all camera positions:** inspect the registered cameras and select one
   to examine its source image and view the reconstruction from that camera.
 
-Keys **1–5** select the first five views. **C** toggles camera positions.
+Keys **1–4** select the point-cloud views and the 3D mesh. **C** toggles camera positions.
 **Esc** exits a camera preview or clears a camera selection, depending on the current view.
 
 ## RQF-based camera suggestions

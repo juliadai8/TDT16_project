@@ -30,8 +30,9 @@ public class BottlePointCloudViewer : MonoBehaviour
     private bool cameraClickArmed;
     private OrbitCamera orbitCamera;
     private bool showComparisonPhoto=true;
-    private float comparisonPhotoOpacity=.5f;
+    private float comparisonPhotoOpacity=1f;
     private float comparisonModelOpacity=1f;
+    private bool blendComparison;
     private bool tintComparisonModel=true;
     private bool IsMatchedView => orbitCamera!=null && orbitCamera.IsMatchedView;
     public Rect MatchedViewArea => Screen.width>=680
@@ -39,7 +40,7 @@ public class BottlePointCloudViewer : MonoBehaviour
         : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
 
     private Rect ControlPanelRect => new Rect(15,15,300,Mathf.Min(
-        450 + (cameraDisplay != null && cameraDisplay.Visible ? 105 : 0) +
+        419 +
         (currentMode == DisplayMode.MeshCoverage ? 105 : 0),Screen.height-30));
     private Vector2 controlScroll;
     private Rect SelectionPanelRect => Screen.width >= 680
@@ -100,9 +101,6 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (keyboard.digit4Key.wasPressedThisFrame)
             SetMode(DisplayMode.Mesh);
-
-        if (keyboard.digit5Key.wasPressedThisFrame)
-            SetMode(DisplayMode.MeshCoverage);
 
         if (keyboard.cKey.wasPressedThisFrame && !IsMatchedView)
             SetCamerasVisible(cameraDisplay == null || !cameraDisplay.Visible);
@@ -414,11 +412,8 @@ public class BottlePointCloudViewer : MonoBehaviour
         GUILayout.Space(10);
         GUILayout.Label("Surface",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
         DrawModeButton(DisplayMode.Mesh,"3D mesh");
-        DrawModeButton(DisplayMode.MeshCoverage,"Mesh coverage");
         GUILayout.Space(10);
         GUILayout.Label("View planning",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
-        DrawModeButton(DisplayMode.RQF,"RQF filters + next-best-view");
-        if (!string.IsNullOrEmpty(rqfError)) GUILayout.Label(rqfError);
 
         bool showCameras = cameraDisplay != null && cameraDisplay.Visible;
         bool guiEnabled=GUI.enabled;
@@ -432,14 +427,9 @@ public class BottlePointCloudViewer : MonoBehaviour
         GUI.backgroundColor=cameraButtonBackground;
         GUI.enabled=guiEnabled;
         if (requested != showCameras) SetCamerasVisible(requested);
-        if (cameraDisplay != null && cameraDisplay.Visible)
-        {
-            if(IsMatchedView)GUILayout.Label("Matched view: camera markers hidden.");
-            GUILayout.Label(cameraDisplay.Count + " registered camera poses");
-            GUILayout.Label("Click a camera to identify its image.");
-            GUILayout.Label("Yellow: selected. Orange: direction/up.");
-            GUILayout.Label("Drag empty space to orbit. Scroll to zoom.");
-        }
+        GUILayout.Space(3);
+        DrawModeButton(DisplayMode.RQF,"RQF filters + next-best-view");
+        if (!string.IsNullOrEmpty(rqfError)) GUILayout.Label(rqfError);
         if (!string.IsNullOrEmpty(cameraError)) GUILayout.Label(cameraError);
 
 
@@ -458,6 +448,19 @@ public class BottlePointCloudViewer : MonoBehaviour
         GUILayout.EndArea();
         DrawSelectedCamera();
         rqfDisplay?.Draw(orbitCamera);
+        if (orbitCamera != null && !orbitCamera.IsNextBestViewPreview)
+        {
+            var navigationHintStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 15,
+                alignment = TextAnchor.MiddleCenter
+            };
+            if (cameraDisplay != null && cameraDisplay.Visible)
+                GUI.Label(new Rect(0, Screen.height - 62, Screen.width, 26),
+                    cameraDisplay.Count + " cameras · Click one to view its photo", navigationHintStyle);
+            GUI.Label(new Rect(0, Screen.height - 34, Screen.width, 26),
+                "Drag to orbit · Scroll to zoom", navigationHintStyle);
+        }
     }
 
     void DrawSelectedCamera()
@@ -481,36 +484,54 @@ public class BottlePointCloudViewer : MonoBehaviour
             if(GUILayout.Button("3D mesh"))SetMode(DisplayMode.Mesh);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if(GUILayout.Button("Model only")){showComparisonPhoto=false;comparisonModelOpacity=1;}
-            if(GUILayout.Button("Blend")){showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=.5f;}
-            if(GUILayout.Button("Photo only")){showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=0;}
+            if(GUILayout.Button("Model only")){blendComparison=false;showComparisonPhoto=false;comparisonModelOpacity=1;}
+            if(GUILayout.Button("Blend")){blendComparison=true;showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=.5f;}
+            if(GUILayout.Button("Photo only")){blendComparison=false;showComparisonPhoto=true;comparisonPhotoOpacity=1;comparisonModelOpacity=0;}
             GUILayout.EndHorizontal();
+            if (blendComparison)
+            {
+                bool wasEnabled = GUI.enabled;
+                GUI.enabled = wasEnabled && showComparisonPhoto;
+                comparisonPhotoOpacity = DrawOpacitySlider("Photo opacity", comparisonPhotoOpacity);
+                GUI.enabled = wasEnabled;
+                comparisonModelOpacity = DrawOpacitySlider("Model opacity", comparisonModelOpacity);
+            }
             if(currentMode==DisplayMode.Original || currentMode==DisplayMode.Mesh)
                 tintComparisonModel=GUILayout.Toggle(tintComparisonModel,"Tint reconstruction cyan");
             showComparisonPhoto=GUILayout.Toggle(showComparisonPhoto,"Photo behind reconstruction");
-            GUILayout.Label("Photo opacity: "+Mathf.RoundToInt(comparisonPhotoOpacity*100)+"%");
-            bool enabled=GUI.enabled;GUI.enabled=showComparisonPhoto;
-            comparisonPhotoOpacity=GUILayout.HorizontalSlider(comparisonPhotoOpacity,0,1);
-            GUI.enabled=enabled;
-            GUILayout.Label("Reconstruction opacity: "+Mathf.RoundToInt(comparisonModelOpacity*100)+"%");
-            comparisonModelOpacity=GUILayout.HorizontalSlider(comparisonModelOpacity,0,1);
             if(GUILayout.Button("Return to free orbit (Esc)"))ReturnToOrbit();
         }
-        else if(GUILayout.Button("View from selected camera"))ViewSelectedCamera();
+        else
+        {
+            GUILayout.Label("Yellow: selected · Orange: direction/up", wrap);
+            if(GUILayout.Button("View from selected camera"))ViewSelectedCamera();
+        }
         if (imagePreview.Texture != null)
         {
             Rect imageRect = GUILayoutUtility.GetRect(SelectionPanelRect.width-20,240);
             imagePreview.Draw(imageRect);
         }
         else GUILayout.Label(imagePreview.Status ?? "Original photo not available locally.",wrap);
-        if (GUILayout.Button("Clear selection (Esc)"))
+        if (!IsMatchedView && GUILayout.Button("Clear selection (Esc)"))
         {
-            if(IsMatchedView)ReturnToOrbit();
             cameraDisplay.ClearSelection();
             imagePreview.SetImage(null);
         }
         GUILayout.EndScrollView();
         GUILayout.EndArea();
+    }
+
+    static float DrawOpacitySlider(string label, float value)
+    {
+        GUILayout.Label(label + ": " + Mathf.RoundToInt(value * 100) + "%");
+        Rect sliderRect = GUILayoutUtility.GetRect(0, 30, GUILayout.ExpandWidth(true));
+        Color previousColor = GUI.color;
+        GUI.color = new Color(.45f, .5f, .52f);
+        GUI.DrawTexture(new Rect(sliderRect.x + 9, sliderRect.center.y - 2, sliderRect.width - 18, 4), Texture2D.whiteTexture);
+        GUI.color = previousColor;
+        var trackStyle = new GUIStyle(GUIStyle.none) { fixedHeight = 24 };
+        var thumbStyle = new GUIStyle(GUI.skin.button) { fixedWidth = 18, fixedHeight = 24 };
+        return GUI.HorizontalSlider(sliderRect, value, 0, 1, trackStyle, thumbStyle);
     }
 
     void OnDestroy()

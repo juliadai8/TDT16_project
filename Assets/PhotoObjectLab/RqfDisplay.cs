@@ -24,12 +24,10 @@ public sealed class RqfDisplay : IDisposable
     static readonly string[] Names = { "Coverage need", "Density need", "Boundary need", "Texture need", "Combined RQF" };
     MeshFilter filter;
     MeshRenderer renderer;
-    Mesh original, colored, markerMesh, focusMesh;
+    Mesh original, colored, markerMesh, targetMesh;
     Material[] originalMaterials;
-    Material material, markerMaterial;
-    GameObject markerRoot, focusRoot, visibilityRoot;
-    MeshCollider surface;
-    readonly List<int> focusSamples = new List<int>();
+    Material material, markerMaterial, targetMaterial;
+    GameObject markerRoot, targetRoot;
     Transform frame;
     Vector3 displayAxis, displayCenter;
     float displayExtent;
@@ -71,11 +69,10 @@ public sealed class RqfDisplay : IDisposable
         {
             if (colored == null) Load(target, coordinateFrame);
             shown = true;
-            visibilityRoot.SetActive(true);
             ApplyBackground();
             ApplyPalette();
             markerRoot.SetActive(true);
-            focusRoot.SetActive(showFocus);
+            targetRoot.SetActive(showFocus);
             return true;
         }
         catch (Exception e) { error = "RQF: " + e.Message; Dispose(); return false; }
@@ -170,19 +167,16 @@ public sealed class RqfDisplay : IDisposable
         markerRoot = new GameObject("RQF camera and target"); markerRoot.transform.SetParent(frame, false);
         markerMesh = new Mesh { name = "RQF next camera and surface target" };
         markerRoot.AddComponent<MeshFilter>().sharedMesh = markerMesh;
-        var mr = markerRoot.AddComponent<MeshRenderer>(); mr.sharedMaterial = markerMaterial;
+        var mr = markerRoot.AddComponent<MeshRenderer>(); mr.sharedMaterials = new[] { markerMaterial, markerMaterial };
         mr.shadowCastingMode = ShadowCastingMode.Off; mr.receiveShadows = false;
-        focusRoot = new GameObject("RQF target neighborhood"); focusRoot.transform.SetParent(frame, false);
-        focusMesh = new Mesh { name = "RQF visible target neighborhood", indexFormat = IndexFormat.UInt32 };
-        focusRoot.AddComponent<MeshFilter>().sharedMesh = focusMesh;
-        var focusRenderer = focusRoot.AddComponent<MeshRenderer>(); focusRenderer.sharedMaterial = markerMaterial;
-        focusRenderer.shadowCastingMode = ShadowCastingMode.Off; focusRenderer.receiveShadows = false;
-        // A private collider supports overlay visibility only; it never changes the RQF ranking.
-        visibilityRoot = new GameObject("RQF overlay visibility only") { hideFlags = HideFlags.HideAndDontSave, layer = 2 };
-        visibilityRoot.transform.SetPositionAndRotation(filter.transform.position, filter.transform.rotation);
-        visibilityRoot.transform.localScale = filter.transform.lossyScale;
-        surface = visibilityRoot.AddComponent<MeshCollider>(); surface.sharedMesh = original;
-        Physics.SyncTransforms();
+        targetRoot=new GameObject("RQF surface target");targetRoot.transform.SetParent(frame,false);
+        targetMesh=new Mesh {name="RQF filled surface marker",indexFormat=IndexFormat.UInt32};
+        targetRoot.AddComponent<MeshFilter>().sharedMesh=targetMesh;
+        // Draw the surface overlay just ahead of the mesh without separating adjacent faces.
+        targetMaterial=new Material(lines){name="RQF surface target overlay",renderQueue=2010};
+        targetMaterial.SetFloat("_DepthBias",-4);
+        var targetRenderer=targetRoot.AddComponent<MeshRenderer>();targetRenderer.sharedMaterial=targetMaterial;
+        targetRenderer.shadowCastingMode=ShadowCastingMode.Off;targetRenderer.receiveShadows=false;
         UpdateReachable();
     }
 
@@ -262,37 +256,6 @@ public sealed class RqfDisplay : IDisposable
         return rotation;
     }
 
-    // This neighborhood is a display aid, not a predicted gain or a new planning score.
-    void UpdateFocus()
-    {
-        focusSamples.Clear();
-        if (Selected == null) return;
-        visibilityRoot.transform.SetPositionAndRotation(filter.transform.position, filter.transform.rotation);
-        visibilityRoot.transform.localScale = filter.transform.lossyScale;
-        Physics.SyncTransforms();
-        var pose = Selected;
-        Quaternion inverse = Quaternion.Inverse(CameraRotation(pose));
-        float radius = original.bounds.size.magnitude * .12f;
-        float tangent = Mathf.Tan(pose.verticalFov * Mathf.Deg2Rad * .5f);
-        Vector3 camera = frame.TransformPoint(pose.position);
-        for (int i = 0; i < samples.Length; i++)
-        {
-            var sample = samples[i];
-            if ((sample.position - pose.target).sqrMagnitude > radius * radius) continue;
-            Vector3 local = inverse * (sample.position - pose.position);
-            if (local.z <= 0 || Mathf.Abs(local.x) > local.z * tangent * pose.aspect || Mathf.Abs(local.y) > local.z * tangent) continue;
-            Vector3 point = frame.TransformPoint(sample.position), delta = point - camera;
-            float distance = delta.magnitude;
-            Vector3 normal = frame.TransformDirection(sample.normal).normalized;
-            if (distance <= 1e-6f || Vector3.Dot(normal, -delta / distance) <= 0) continue;
-            float tolerance = Mathf.Max(surface.bounds.size.magnitude * 1e-4f, distance * 1e-4f);
-            if (!surface.Raycast(new Ray(camera, delta / distance), out RaycastHit hit, distance + tolerance) ||
-                Mathf.Abs(hit.distance - distance) > tolerance) continue;
-            focusSamples.Add(i);
-        }
-        focusSamples.Sort((a,b) => (samples[a].position-pose.target).sqrMagnitude.CompareTo((samples[b].position-pose.target).sqrMagnitude));
-    }
-
     void UpdateReachable()
     {
         reachable.Clear();
@@ -303,9 +266,9 @@ public sealed class RqfDisplay : IDisposable
 
     void UpdateMarker()
     {
-        UpdateFocus();
+        UpdateSurfaceTarget();
         var v = new List<Vector3>(); var c = new List<Color32>(); var ix = new List<int>();
-        var dotVertices = new List<Vector3>(); var dotColors = new List<Color32>(); var dotIndices = new List<int>();
+        var rayTriangles = new List<int>();
         if (Selected != null)
         {
             var pose = Selected;
@@ -313,7 +276,7 @@ public sealed class RqfDisplay : IDisposable
             float extent = original.bounds.size.magnitude, depth = extent * .11f;
             float h = depth * Mathf.Tan(pose.verticalFov * Mathf.Deg2Rad * .5f);
             Vector3[] corners = new Vector3[4];
-            Color gold = new Color(1,.8f,.15f), cyan = new Color(.15f,.95f,1);
+            Color gold = new Color(1,.8f,.15f), targetBlue = new Color(.06f,.18f,.58f);
             if (showCamera)
             {
                 for(int j=0;j<4;j++)corners[j]=pose.position+rotation*new Vector3((j==0||j==3?-1:1)*h*pose.aspect,(j<2?1:-1)*h,depth);
@@ -328,37 +291,35 @@ public sealed class RqfDisplay : IDisposable
                 Line(corners[0],top,gold,v,c,ix);Line(top,corners[1],gold,v,c,ix);
             }
             float size = extent * .004f;
-            Vector3[] offsets = {Vector3.right,Vector3.left,Vector3.up,Vector3.down,Vector3.forward,Vector3.back};
-            int[] faces = {2,0,4,2,4,1,2,1,5,2,5,0,3,4,0,3,1,4,3,5,1,3,0,5};
-            foreach (int i in focusSamples)
-            {
-                int start=dotVertices.Count;
-                foreach(Vector3 offset in offsets)
-                {dotVertices.Add(samples[i].position+samples[i].normal*size+offset*size);dotColors.Add(cyan);}
-                foreach(int face in faces)dotIndices.Add(start+face);
-            }
-            // Always identify the exact exported target, independently of the neighborhood overlay.
-            Vector3 target=pose.target+samples[pose.sample].normal*size;
-            Vector3 right=rotation*Vector3.right*size*2.5f, up=rotation*Vector3.up*size*2.5f;
-            if(showFocus){Line(target-right,target+right,cyan,v,c,ix);Line(target-up,target+up,cyan,v,c,ix);}
             if(showRays && showCamera)
-            {
-                var endpoints = new List<Vector3> {pose.target};
-                Line(pose.position,target,new Color(.2f,.65f,.8f),v,c,ix);
-                foreach(int i in focusSamples)
-                {
-                    Vector3 point=samples[i].position;
-                    if(endpoints.Exists(p => (p-point).sqrMagnitude < extent*extent*.000625f))continue;
-                    endpoints.Add(point);Line(pose.position,point+samples[i].normal*size,new Color(.2f,.65f,.8f),v,c,ix);
-                    if(endpoints.Count>=8)break;
-                }
-            }
+                RayTube(pose.position,pose.target,size*.18f,targetBlue,v,c,rayTriangles);
         }
-        markerMesh.Clear();markerMesh.SetVertices(v);markerMesh.SetColors(c);markerMesh.SetIndices(ix.ToArray(),MeshTopology.Lines,0);markerMesh.RecalculateBounds();
-        focusMesh.Clear();focusMesh.SetVertices(dotVertices);focusMesh.SetColors(dotColors);focusMesh.SetTriangles(dotIndices,0);focusMesh.RecalculateBounds();
+        markerMesh.Clear();markerMesh.SetVertices(v);markerMesh.SetColors(c);markerMesh.subMeshCount=2;
+        markerMesh.SetIndices(ix.ToArray(),MeshTopology.Lines,0);markerMesh.SetTriangles(rayTriangles,1);markerMesh.RecalculateBounds();
     }
     static void Line(Vector3 a,Vector3 b,Color32 color,List<Vector3> v,List<Color32> c,List<int> ix)
     {ix.Add(v.Count);v.Add(a);c.Add(color);ix.Add(v.Count);v.Add(b);c.Add(color);}
+
+    // A narrow tube gives rays visible thickness independently of hardware line rendering.
+    static void RayTube(Vector3 a,Vector3 b,float radius,Color32 color,List<Vector3> v,List<Color32> c,List<int> triangles)
+    {
+        Vector3 direction=(b-a).normalized;
+        if(direction.sqrMagnitude<.5f)return;
+        Vector3 side=Vector3.Cross(direction,Mathf.Abs(direction.y)<.9f?Vector3.up:Vector3.right).normalized;
+        Vector3 up=Vector3.Cross(direction,side);
+        int start=v.Count;
+        for(int end=0;end<2;end++)for(int j=0;j<6;j++)
+        {
+            float angle=j*Mathf.PI/3;
+            v.Add((end==0?a:b)+radius*(side*Mathf.Cos(angle)+up*Mathf.Sin(angle)));c.Add(color);
+        }
+        for(int j=0;j<6;j++)
+        {
+            int next=(j+1)%6;
+            triangles.Add(start+j);triangles.Add(start+next);triangles.Add(start+j+6);
+            triangles.Add(start+next);triangles.Add(start+next+6);triangles.Add(start+j+6);
+        }
+    }
 
     public void Preview(OrbitCamera orbit)
     {
@@ -374,7 +335,14 @@ public sealed class RqfDisplay : IDisposable
         if (Selected != null && Camera.main != null)
         {
             if(showCamera) LabelAt(Selected.position,"Next camera",105);
-            if(showFocus) LabelAt(Selected.target,"RQF target",95);
+            if(showFocus)
+            {
+                Vector3 world=frame.TransformPoint(Selected.target);
+                float radius=original.bounds.size.magnitude*.035f*Mathf.Abs(frame.lossyScale.x);
+                float screenRadius=Vector3.Distance(Camera.main.WorldToScreenPoint(world),
+                    Camera.main.WorldToScreenPoint(world+Camera.main.transform.up*radius));
+                LabelAt(Selected.target,"RQF target",95,screenRadius+32);
+            }
         }
         GUILayout.BeginArea(Panel,GUI.skin.box);
         scroll=GUILayout.BeginScrollView(scroll);
@@ -404,6 +372,14 @@ public sealed class RqfDisplay : IDisposable
             bool previewing=orbit!=null&&orbit.IsNextBestViewPreview;
             if(GUILayout.Button(previewing?"Return to model":"Preview camera",GUILayout.Height(30)))
             {if(previewing)orbit.EndNextBestViewPreview();else Preview(orbit);}
+            if(orbit!=null && orbit.IsNextBestViewPreview)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label($"Inspection zoom: {orbit.PreviewZoom:0.0}×");
+                if(GUILayout.Button("Reset zoom"))orbit.ResetPreviewZoom();
+                GUILayout.EndHorizontal();
+                GUILayout.Label("Scroll over model to zoom · Camera pose unchanged",wrap);
+            }
             bool enabled=GUI.enabled;
             GUILayout.BeginHorizontal();
             GUI.enabled=enabled&&proposalIndex+1<reachable.Count;
@@ -434,10 +410,10 @@ public sealed class RqfDisplay : IDisposable
         {
             bool heatmap=GUILayout.Toggle(showHeatmap,"Surface colors");
             if(heatmap!=showHeatmap){showHeatmap=heatmap;ApplyBackground();}
-            bool focus=GUILayout.Toggle(showFocus,"Target area (cyan)");
-            bool rays=GUILayout.Toggle(showRays,"View rays");
+            bool focus=GUILayout.Toggle(showFocus,"Surface target marker");
+            bool rays=GUILayout.Toggle(showRays,"Camera-to-target line");
             bool refresh=focus!=showFocus||rays!=showRays;
-            showFocus=focus;showRays=rays;focusRoot.SetActive(showFocus);
+            showFocus=focus;showRays=rays;targetRoot.SetActive(showFocus);
             if(refresh)UpdateMarker();
             bool display=GUILayout.Toggle(showCamera,"Show camera marker");
             if(display!=showCamera){showCamera=display;UpdateMarker();}
@@ -484,10 +460,69 @@ public sealed class RqfDisplay : IDisposable
         if(value>=0)Fill(new Rect(rect.x,rect.y,rect.width*Mathf.Clamp01(value),rect.height),ColorFor(value));
     }
 
-    void LabelAt(Vector3 point,string label,float width)
+    // Clip actual surface triangles to a circular footprint around the target.
+    // Its fixed model-space radius is only a marker size, not a predicted improvement area.
+    void UpdateSurfaceTarget()
+    {
+        targetMesh.Clear();
+        if(Selected==null)return;
+        Vector3 center=Selected.target, normal=samples[Selected.sample].normal.normalized;
+        Vector3 right=Vector3.Cross(normal,Mathf.Abs(normal.y)<.9f?Vector3.up:Vector3.right).normalized;
+        Vector3 up=Vector3.Cross(normal,right);
+        float radius=original.bounds.size.magnitude*.035f;
+        targetMaterial.SetFloat("_SurfaceMarker",1);
+        targetMaterial.SetVector("_TargetCenter",new Vector4(center.x,center.y,center.z,0));
+        targetMaterial.SetVector("_TargetNormal",new Vector4(normal.x,normal.y,normal.z,0));
+        targetMaterial.SetFloat("_TargetRadius",radius);
+        Vector3[] vertices=original.vertices;
+        int[] faces=original.triangles;
+        var output=new List<Vector3>();var colors=new List<Color32>();var indices=new List<int>();
+        var polygon=new List<Vector3>(40);var clipped=new List<Vector3>(40);
+        var planes=new Vector3[128];
+        for(int j=0;j<planes.Length;j++)
+        {
+            float angle=2*Mathf.PI*j/planes.Length;
+            planes[j]=right*Mathf.Cos(angle)+up*Mathf.Sin(angle);
+        }
+        for(int face=0;face<faces.Length;face+=3)
+        {
+            Vector3 a=frame.InverseTransformPoint(filter.transform.TransformPoint(vertices[faces[face]]));
+            Vector3 b=frame.InverseTransformPoint(filter.transform.TransformPoint(vertices[faces[face+1]]));
+            Vector3 c=frame.InverseTransformPoint(filter.transform.TransformPoint(vertices[faces[face+2]]));
+            var bounds=new Bounds(a,Vector3.zero);bounds.Encapsulate(b);bounds.Encapsulate(c);
+            if(bounds.SqrDistance(center)>radius*radius*1.4f)continue;
+            // Exclude unrelated surfaces behind the selected patch.
+            if(Mathf.Abs(Vector3.Dot((a+b+c)/3-center,normal))>radius*.6f)continue;
+            polygon.Clear();polygon.Add(a);polygon.Add(b);polygon.Add(c);
+            foreach(Vector3 plane in planes)
+            {
+                clipped.Clear();
+                if(polygon.Count==0)break;
+                Vector3 previous=polygon[polygon.Count-1];
+                float previousDistance=Vector3.Dot(previous-center,plane)-radius;
+                foreach(Vector3 current in polygon)
+                {
+                    float distance=Vector3.Dot(current-center,plane)-radius;
+                    if((distance<=0)!=(previousDistance<=0))
+                        clipped.Add(Vector3.Lerp(previous,current,previousDistance/(previousDistance-distance)));
+                    if(distance<=0)clipped.Add(current);
+                    previous=current;previousDistance=distance;
+                }
+                var swap=polygon;polygon=clipped;clipped=swap;
+            }
+            int start=output.Count;
+            foreach(Vector3 point in polygon)
+            {output.Add(point);colors.Add(new Color32(15,46,148,255));}
+            for(int j=1;j+1<polygon.Count;j++)
+            {indices.Add(start);indices.Add(start+j);indices.Add(start+j+1);}
+        }
+        targetMesh.SetVertices(output);targetMesh.SetColors(colors);targetMesh.SetTriangles(indices,0);targetMesh.RecalculateBounds();
+    }
+
+    void LabelAt(Vector3 point,string label,float width,float verticalOffset=30)
     {
         Vector3 p=Camera.main.WorldToScreenPoint(frame.TransformPoint(point));
-        if(p.z>0)GUI.Box(new Rect(p.x-width*.5f,Screen.height-p.y-30,width,24),label);
+        if(p.z>0)GUI.Box(new Rect(p.x-width*.5f,Screen.height-p.y-verticalOffset,width,24),label);
     }
 
     public void Restore()
@@ -496,13 +531,12 @@ public sealed class RqfDisplay : IDisposable
         if(filter!=null&&original!=null)filter.sharedMesh=original;
         if(renderer!=null&&originalMaterials!=null)renderer.sharedMaterials=originalMaterials;
         if(markerRoot!=null)markerRoot.SetActive(false);
-        if(focusRoot!=null)focusRoot.SetActive(false);
-        if(visibilityRoot!=null)visibilityRoot.SetActive(false);
+        if(targetRoot!=null)targetRoot.SetActive(false);
     }
     public void Dispose()
     {
-        Restore();Release(colored);Release(material);Release(markerMesh);Release(markerMaterial);Release(markerRoot);Release(focusMesh);Release(focusRoot);Release(visibilityRoot);
-        colored=null;material=null;markerMesh=null;markerMaterial=null;markerRoot=null;focusMesh=null;focusRoot=null;visibilityRoot=null;surface=null;
+        Restore();Release(colored);Release(material);Release(markerMesh);Release(markerMaterial);Release(markerRoot);Release(targetMesh);Release(targetRoot);Release(targetMaterial);
+        colored=null;material=null;markerMesh=null;markerMaterial=null;markerRoot=null;targetMesh=null;targetRoot=null;targetMaterial=null;
     }
     static void Release(UnityEngine.Object value)
     {if(value==null)return;if(Application.isPlaying)UnityEngine.Object.Destroy(value);else UnityEngine.Object.DestroyImmediate(value);}

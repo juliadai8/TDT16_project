@@ -6,7 +6,8 @@ public static class ExifPreviewPixels
 {
     public static T[] Prepare<T>(T[] source,int width,int height,int orientation,
                                 int maxSize,out int outputWidth,out int outputHeight,
-                                double focalX=0,double focalY=0,double principalX=0,double principalY=0,double radialK=0)
+                                double focalX=0,double focalY=0,double principalX=0,double principalY=0,double radialK=0,
+                                Func<T,T,T,T,double,double,T> interpolate=null)
     {
         if(source==null || width<=0 || height<=0 || maxSize<=0 || source.Length!=(long)width*height)
             throw new ArgumentException("Invalid preview pixel dimensions.");
@@ -19,9 +20,12 @@ public static class ExifPreviewPixels
         var output=new T[outputWidth*outputHeight];
         for(int y=0;y<outputHeight;y++)for(int x=0;x<outputWidth;x++)
         {
-            int dx=Math.Min(orientedWidth-1,(int)((x+.5)*orientedWidth/outputWidth));
-            int dy=Math.Min(orientedHeight-1,(int)((y+.5)*orientedHeight/outputHeight));
-            int sx=dx,sy=dy;
+            // Interpolated previews preserve subpixel positions through rotation and lens correction.
+            double dx=interpolate==null ? Math.Min(orientedWidth-1,(int)((x+.5)*orientedWidth/outputWidth))
+                : Math.Max(0,Math.Min(orientedWidth-1,(x+.5)*orientedWidth/outputWidth-.5));
+            double dy=interpolate==null ? Math.Min(orientedHeight-1,(int)((y+.5)*orientedHeight/outputHeight))
+                : Math.Max(0,Math.Min(orientedHeight-1,(y+.5)*orientedHeight/outputHeight-.5));
+            double sx=dx,sy=dy;
             switch(orientation)
             {
                 case 2:sx=width-1-dx;break;
@@ -36,11 +40,21 @@ public static class ExifPreviewPixels
             {
                 double nx=(sx-principalX)/focalX,ny=(height-1-sy-principalY)/focalY;
                 double distortion=1+radialK*(nx*nx+ny*ny);
-                sx=(int)Math.Round(focalX*nx*distortion+principalX);
-                sy=height-1-(int)Math.Round(focalY*ny*distortion+principalY);
+                sx=focalX*nx*distortion+principalX;
+                sy=height-1-(focalY*ny*distortion+principalY);
+                if(interpolate==null){sx=Math.Round(sx);sy=Math.Round(sy);}
             }
             if(sx>=0 && sx<width && sy>=0 && sy<height)
-                output[y*outputWidth+x]=source[sy*width+sx];
+            {
+                int x0=(int)sx,y0=(int)sy;
+                if(interpolate==null)output[y*outputWidth+x]=source[y0*width+x0];
+                else
+                {
+                    int x1=Math.Min(width-1,x0+1),y1=Math.Min(height-1,y0+1);
+                    output[y*outputWidth+x]=interpolate(source[y0*width+x0],source[y0*width+x1],
+                        source[y1*width+x0],source[y1*width+x1],sx-x0,sy-y0);
+                }
+            }
         }
         return output;
     }

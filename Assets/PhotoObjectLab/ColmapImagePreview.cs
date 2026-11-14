@@ -85,11 +85,14 @@ public sealed class ColmapImagePreview : IDisposable
             k=calibration.radialK;
         }
         Color32[] pixels = ExifPreviewPixels.Prepare(original.GetPixels32(),original.width,original.height,
-            orientation,1024,out int width,out int height,fx,fy,cx,cy,k);
+            orientation,calibration!=null ? 2560 : 1024,out int width,out int height,fx,fy,cx,cy,k,
+            (a,b,c,d,x,y) => Color32.Lerp(Color32.Lerp(a,b,(float)x),Color32.Lerp(c,d,(float)x),(float)y));
         var preview = new Texture2D(width,height,TextureFormat.RGBA32,false);
         try
         {
             preview.name = "Upright camera image preview";
+            preview.filterMode = FilterMode.Bilinear;
+            preview.wrapMode = TextureWrapMode.Clamp;
             preview.SetPixels32(pixels);
             preview.Apply(false,true);
             return preview;

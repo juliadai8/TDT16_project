@@ -21,7 +21,10 @@ public class OrbitCamera : MonoBehaviour
     public bool IsNextBestViewPreview { get; private set; }
     Vector3 nbvSavedPosition;
     Quaternion nbvSavedRotation;
+    Matrix4x4 nbvSavedProjection;
     float nbvSavedFov, nbvSavedAspect;
+    float nbvPreviewFov;
+    public float PreviewZoom { get; private set; } = 1f;
 
     public void PreviewNextBestView(Vector3 position, Quaternion rotation, float verticalFov)
     {
@@ -31,12 +34,30 @@ public class OrbitCamera : MonoBehaviour
         {
             nbvSavedPosition = transform.position; nbvSavedRotation = transform.rotation;
             nbvSavedFov = camera.fieldOfView; nbvSavedAspect = camera.aspect;
+            nbvSavedProjection = camera.projectionMatrix;
         }
         IsNextBestViewPreview = true;
         transform.SetPositionAndRotation(position, rotation);
-        camera.fieldOfView = verticalFov;
+        nbvPreviewFov = verticalFov;
+        ResetPreviewZoom();
         // Use the current viewport aspect for the preview; planning uses a 4:3 sensor.
         // The panel explicitly describes this as a preview, not a calibrated photo.
+    }
+
+    public void ResetPreviewZoom()
+    {
+        if (!IsNextBestViewPreview) return;
+        PreviewZoom = 1f;
+        ApplyPreviewZoom();
+    }
+
+    void ApplyPreviewZoom()
+    {
+        Camera camera = GetComponent<Camera>();
+        camera.fieldOfView = 2f * Mathf.Atan(
+            Mathf.Tan(nbvPreviewFov * Mathf.Deg2Rad * .5f) / PreviewZoom) * Mathf.Rad2Deg;
+        // Photo comparison can leave a custom matrix, which otherwise ignores field-of-view changes.
+        camera.ResetProjectionMatrix();
     }
 
     public void EndNextBestViewPreview()
@@ -45,7 +66,8 @@ public class OrbitCamera : MonoBehaviour
         transform.SetPositionAndRotation(nbvSavedPosition, nbvSavedRotation);
         Camera camera = GetComponent<Camera>();
         camera.fieldOfView = nbvSavedFov; camera.aspect = nbvSavedAspect;
-        IsNextBestViewPreview = false; allowOrbit = false; dragging = false;
+        camera.projectionMatrix = nbvSavedProjection;
+        IsNextBestViewPreview = false; PreviewZoom = 1f; allowOrbit = false; dragging = false;
     }
 
     public bool TryViewCamera(ColmapCameraDisplay.CameraRecord record,Transform frame,int orientation,
@@ -73,7 +95,22 @@ public class OrbitCamera : MonoBehaviour
 
     void LateUpdate()
     {
-        if (IsNextBestViewPreview) return;
+        if (IsNextBestViewPreview)
+        {
+            // Inspect by changing the field of view; preserve the proposed camera pose.
+            Mouse previewMouse = Mouse.current;
+            if (previewMouse != null && (viewer == null || !viewer.IsPointerOverUI(previewMouse.position.ReadValue())))
+            {
+                float previewScroll = previewMouse.scroll.ReadValue().y;
+                if (previewScroll != 0)
+                {
+                    const float previewZoomSensitivity = .01f;
+                    PreviewZoom = Mathf.Clamp(PreviewZoom * Mathf.Exp(Mathf.Clamp(previewScroll * previewZoomSensitivity, -.35f, .35f)), .5f, 4f);
+                    ApplyPreviewZoom();
+                }
+            }
+            return;
+        }
         if(IsMatchedView)
         {
             matchedView.Refresh(viewer!=null?viewer.MatchedViewArea:new Rect(0,0,Screen.width,Screen.height));
