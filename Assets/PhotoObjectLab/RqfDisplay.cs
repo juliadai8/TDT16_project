@@ -27,6 +27,8 @@ public sealed class RqfDisplay : IDisposable
     Mesh original, colored, markerMesh, targetMesh;
     Material[] originalMaterials;
     Material material, markerMaterial, targetMaterial;
+    BottlePhotoTextureDisplay photoBackground;
+    string photoBackgroundError;
     GameObject markerRoot, targetRoot;
     Transform frame;
     Vector3 displayAxis, displayCenter;
@@ -56,7 +58,7 @@ public sealed class RqfDisplay : IDisposable
     public int ProposalCount => reachable.Count;
     public Rect Panel => new Rect(Mathf.Max(330, Screen.width - 355), 15, 340,
         Mathf.Min(Mathf.Max(100, Screen.height - 30),
-            550 + (showWhy ? 260 : 0) + (showAdvanced ? 205 : 0)));
+            650 + (showWhy ? 260 : 0) + (showAdvanced ? 205 : 0)));
     public bool Visible => shown;
     public Proposal Selected => proposalIndex < reachable.Count ? reachable[proposalIndex] : null;
     public Sample SelectedSample => Selected == null ? null : samples[Selected.sample];
@@ -206,8 +208,15 @@ public sealed class RqfDisplay : IDisposable
 
     void ApplyBackground()
     {
+        photoBackground?.Restore();
         filter.sharedMesh = showHeatmap ? colored : original;
         renderer.sharedMaterials = showHeatmap ? new[] { material } : originalMaterials;
+        photoBackgroundError = null;
+        if (!showHeatmap)
+        {
+            if (photoBackground == null) photoBackground = new BottlePhotoTextureDisplay();
+            photoBackground.TryShow(filter.gameObject, out photoBackgroundError);
+        }
     }
 
     void FindDisplayAxis()
@@ -292,7 +301,7 @@ public sealed class RqfDisplay : IDisposable
             }
             float size = extent * .004f;
             if(showRays && showCamera)
-                RayTube(pose.position,pose.target,size*.18f,targetBlue,v,c,rayTriangles);
+                RayTube(pose.position,pose.target,size*.30f,targetBlue,v,c,rayTriangles);
         }
         markerMesh.Clear();markerMesh.SetVertices(v);markerMesh.SetColors(c);markerMesh.subMeshCount=2;
         markerMesh.SetIndices(ix.ToArray(),MeshTopology.Lines,0);markerMesh.SetTriangles(rayTriangles,1);markerMesh.RecalculateBounds();
@@ -332,9 +341,13 @@ public sealed class RqfDisplay : IDisposable
     public void Draw(OrbitCamera orbit)
     {
         if (!shown) return;
+        // Looking along the thick ray from inside the proposed camera can cover the target ring.
+        // Keep only the surface marker visible in preview; restore the camera and ray in overview.
+        bool inPreview = orbit != null && orbit.IsNextBestViewPreview;
+        markerRoot.SetActive(!inPreview);
         if (Selected != null && Camera.main != null)
         {
-            if(showCamera) LabelAt(Selected.position,"Next camera",105);
+            if(showCamera && !inPreview) LabelAt(Selected.position,"Next camera",105);
             if(showFocus)
             {
                 Vector3 world=frame.TransformPoint(Selected.target);
@@ -350,19 +363,29 @@ public sealed class RqfDisplay : IDisposable
         var heading=new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold};
         GUILayout.Label("Next-best-view · RQF",new GUIStyle(heading){fontSize=18});
         GUILayout.Space(10);
-        GUILayout.Label("Surface filter",heading);
-        foreach(int index in FilterOrder)
+        GUILayout.Label("Surface view",heading);
+        GUILayout.BeginHorizontal();
+        DrawSurfaceViewButton("Heatmap", true);
+        DrawSurfaceViewButton("Photo texture", false);
+        GUILayout.EndHorizontal();
+        if (showHeatmap)
         {
-            bool selected=selectedFilter==index;
-            Color previous=GUI.backgroundColor;
-            if(selected)GUI.backgroundColor=new Color(.35f,.80f,.86f);
-            var filterStyle=new GUIStyle(GUI.skin.button){fontStyle=selected?FontStyle.Bold:FontStyle.Normal};
-            if(GUILayout.Button(Names[index],filterStyle,GUILayout.Height(28))&&!selected)
-            {selectedFilter=index;ApplyPalette();}
-            GUI.backgroundColor=previous;
-            GUILayout.Space(3);
+            GUILayout.Space(8);
+            GUILayout.Label("Surface filter",heading);
+            foreach(int index in FilterOrder)
+            {
+                bool selected=selectedFilter==index;
+                Color previous=GUI.backgroundColor;
+                if(selected)GUI.backgroundColor=new Color(.35f,.80f,.86f);
+                var filterStyle=new GUIStyle(GUI.skin.button){fontStyle=selected?FontStyle.Bold:FontStyle.Normal};
+                if(GUILayout.Button(Names[index],filterStyle,GUILayout.Height(28))&&!selected)
+                {selectedFilter=index;ApplyPalette();}
+                GUI.backgroundColor=previous;
+                GUILayout.Space(3);
+            }
+            DrawLegend();
         }
-        DrawLegend();
+        if (!string.IsNullOrEmpty(photoBackgroundError)) GUILayout.Label(photoBackgroundError, wrap);
         GUILayout.Space(12);
         GUILayout.Label("Camera suggestion",heading);
         if(Selected==null)GUILayout.Label("No suggestion. Check Display settings.",wrap);
@@ -380,14 +403,17 @@ public sealed class RqfDisplay : IDisposable
                 GUILayout.EndHorizontal();
                 GUILayout.Label("Scroll over model to zoom · Camera pose unchanged",wrap);
             }
-            bool enabled=GUI.enabled;
-            GUILayout.BeginHorizontal();
-            GUI.enabled=enabled&&proposalIndex+1<reachable.Count;
-            if(GUILayout.Button("Next suggestion")){orbit?.EndNextBestViewPreview();proposalIndex++;UpdateMarker();}
-            GUI.enabled=enabled&&proposalIndex>0;
-            if(GUILayout.Button("Back to best")){orbit?.EndNextBestViewPreview();proposalIndex=0;UpdateMarker();}
-            GUI.enabled=enabled;
-            GUILayout.EndHorizontal();
+            if (orbit == null || !orbit.IsNextBestViewPreview)
+            {
+                bool enabled=GUI.enabled;
+                GUILayout.BeginHorizontal();
+                GUI.enabled=enabled&&proposalIndex+1<reachable.Count;
+                if(GUILayout.Button("Next suggestion")){proposalIndex++;UpdateMarker();}
+                GUI.enabled=enabled&&proposalIndex>0;
+                if(GUILayout.Button("Back to best")){proposalIndex=0;UpdateMarker();}
+                GUI.enabled=enabled;
+                GUILayout.EndHorizontal();
+            }
             if(frame.TransformPoint(Selected.position).y<minimumY-.001f)
                 GUILayout.Label("Below-object pose: reposition the bottle to capture this view.",wrap);
         }
@@ -408,8 +434,6 @@ public sealed class RqfDisplay : IDisposable
         showAdvanced=Section("Display settings",showAdvanced);
         if(showAdvanced)
         {
-            bool heatmap=GUILayout.Toggle(showHeatmap,"Surface colors");
-            if(heatmap!=showHeatmap){showHeatmap=heatmap;ApplyBackground();}
             bool focus=GUILayout.Toggle(showFocus,"Surface target marker");
             bool rays=GUILayout.Toggle(showRays,"Camera-to-target line");
             bool refresh=focus!=showFocus||rays!=showRays;
@@ -425,6 +449,20 @@ public sealed class RqfDisplay : IDisposable
         }
         if(!string.IsNullOrEmpty(GUI.tooltip))GUILayout.Label(GUI.tooltip,wrap);
         GUILayout.EndScrollView();GUILayout.EndArea();
+    }
+
+    void DrawSurfaceViewButton(string label, bool heatmap)
+    {
+        bool selected = showHeatmap == heatmap;
+        Color previous = GUI.backgroundColor;
+        if (selected) GUI.backgroundColor = new Color(.35f, .80f, .86f);
+        var style = new GUIStyle(GUI.skin.button) { fontStyle = selected ? FontStyle.Bold : FontStyle.Normal };
+        if (GUILayout.Button(label, style, GUILayout.Height(28)) && !selected)
+        {
+            showHeatmap = heatmap;
+            ApplyBackground();
+        }
+        GUI.backgroundColor = previous;
     }
 
     static bool Section(string title,bool expanded)
@@ -528,6 +566,7 @@ public sealed class RqfDisplay : IDisposable
     public void Restore()
     {
         shown=false;
+        photoBackground?.Restore();
         if(filter!=null&&original!=null)filter.sharedMesh=original;
         if(renderer!=null&&originalMaterials!=null)renderer.sharedMaterials=originalMaterials;
         if(markerRoot!=null)markerRoot.SetActive(false);
@@ -535,6 +574,7 @@ public sealed class RqfDisplay : IDisposable
     }
     public void Dispose()
     {
+        photoBackground?.Dispose();photoBackground=null;
         Restore();Release(colored);Release(material);Release(markerMesh);Release(markerMaterial);Release(markerRoot);Release(targetMesh);Release(targetRoot);Release(targetMaterial);
         colored=null;material=null;markerMesh=null;markerMaterial=null;markerRoot=null;targetMesh=null;targetRoot=null;targetMaterial=null;
     }

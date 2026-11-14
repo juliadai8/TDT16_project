@@ -1,0 +1,21 @@
+{
+  "method": "OpenMVS TextureMesh 2.4.0 photo texture atlas",
+  "source_vertices": 166953,
+  "display_vertices_at_uv_seams": 198383,
+  "triangles": 333861,
+  "texture_size": [
+    4096,
+    4096
+  ],
+  "triangle_connectivity_unchanged": true,
+  "source_mesh_sha256": "bb637dfbdf6ccfb4fb63c2f0ecbad0293ce9b29a128534a31fe9c467b5188644",
+  "options": {
+    "decimate": 1,
+    "close_holes": 0,
+    "resolution_level": 0,
+    "global_seam_leveling": 0,
+    "local_seam_leveling": 0,
+    "sharpness_weight": 0
+  },
+  "limitations": "Photographic lighting, reflections and patch seams remain. Geometry is not repaired."
+}

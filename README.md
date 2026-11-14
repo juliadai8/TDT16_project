@@ -19,10 +19,13 @@ image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COL
 
 ## Explore the reconstruction
 
-- **Original colors:** the sparse point cloud with its reconstructed colors.
+- **Photo colors:** the sparse point cloud with its reconstructed colors.
 - **Observation count:** the number of image observations supporting each sparse point.
 - **Triangulation angle:** the camera geometry supporting each sparse point.
-- **3D mesh:** the reconstructed surface.
+- **Plain mesh:** the reconstructed surface with soft, camera-relative inspection
+  shading. Ambient fill and gentle front lighting reveal shape without a dark
+  side from the scene lamp; this shading does not indicate reconstruction quality.
+- **Textured mesh:** the same surface with photo texture.
 - **RQF filters + next-best-view:** individual surface need indicators, their
   combined score and a suggested camera position aimed at a high-priority target.
 - **View all camera positions:** inspect the registered cameras and select one
@@ -30,6 +33,31 @@ image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COL
 
 Keys **1–4** select the point-cloud views and the 3D mesh. **C** toggles camera positions.
 **Esc** exits a camera preview or clears a camera selection, depending on the current view.
+In free orbit, **arrow keys** pan the camera in the arrow's direction, and **F** centers
+and fits the entire model while keeping the viewing angle. These controls do not
+move the camera in next-best-view preview or calibrated photo comparison.
+
+Photo comparison has three model choices (point cloud, plain mesh, textured mesh)
+and three comparison modes (model only, overlay, photo only). Overlay uses cyan
+tint with separate photo- and model-opacity sliders. Camera details are collapsed, and the source
+photo remains visible below the controls.
+
+In RQF mode, **Surface view** offers fixed **Heatmap** and **Photo texture** choices.
+The heatmap filters and color legend appear only in Heatmap mode. Switching the
+surface appearance preserves the camera view and selected target. It also works in camera
+preview, making the bottle's photographic pattern available as an orientation aid.
+
+The photo texture was generated with OpenMVS TextureMesh from the existing 73
+calibrated views. It uses a 4096 × 4096 atlas; UV seams add display vertices, while
+the original mesh remains the input to RQF. Lighting, reflections and patch seams
+remain in the texture. It does not repair missing or incorrect geometry.
+
+To regenerate the Unity texture export after running TextureMesh, use
+`python Reconstruction/export_textured_mesh_to_unity.py`. Its input is
+`Reconstruction/bottle/openmvs/textured_raw/BottleTextured.obj` with its companion
+MTL and JPEG. The successful TextureMesh run disabled decimation, hole closing,
+global/local seam leveling and sharpening; see `BottlePhotoTextureReport.json`
+in `Assets/PhotoObjectLab/Resources/` for the exported parameters.
 
 ## RQF-based camera suggestions
 

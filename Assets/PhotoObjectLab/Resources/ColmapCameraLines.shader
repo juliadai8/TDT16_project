@@ -45,11 +45,12 @@ Shader "Custom/ColmapCameraLines"
                     delta -= dot(delta, _TargetNormal.xyz) * _TargetNormal.xyz;
                     float radius = length(delta) / max(_TargetRadius, 0.000001);
                     float edge = max(fwidth(radius), 0.001);
-                    half4 field = half4(0.32,0.58,0.95,1);
+                    half4 field = half4(0.035,0.16,0.65,1);
                     half4 border = half4(0.94,0.97,1,1);
                     half4 center = half4(0.015,0.045,0.16,1);
-                    half4 result = lerp(border,field,smoothstep(0.18-edge,0.18+edge,radius));
-                    return lerp(center,result,smoothstep(0.12-edge,0.12+edge,radius));
+                    half4 result = lerp(border,field,smoothstep(0.24-edge,0.24+edge,radius));
+                    result = lerp(center,result,smoothstep(0.17-edge,0.17+edge,radius));
+                    return result;
                 }
                 return lerp(input.color, half4(1.0,0.72,0.12,1.0), saturate(_Selected)*0.7);
             }

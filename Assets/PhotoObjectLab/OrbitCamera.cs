@@ -16,6 +16,7 @@ public class OrbitCamera : MonoBehaviour
     private Vector2 pressPosition;
     private bool allowOrbit;
     private bool dragging;
+    private Vector3 panOffset;
     private readonly ColmapMatchedView matchedView = new ColmapMatchedView();
     public bool IsMatchedView => matchedView.Active;
     public bool IsNextBestViewPreview { get; private set; }
@@ -116,10 +117,14 @@ public class OrbitCamera : MonoBehaviour
             matchedView.Refresh(viewer!=null?viewer.MatchedViewArea:new Rect(0,0,Screen.width,Screen.height));
             return;
         }
+        HandleKeyboardNavigation();
         Mouse mouse = Mouse.current;
 
         if (mouse == null)
+        {
+            UpdateCamera();
             return;
+        }
 
         Vector2 position = mouse.position.ReadValue();
         if (mouse.leftButton.wasPressedThisFrame)
@@ -153,7 +158,7 @@ public class OrbitCamera : MonoBehaviour
     void UpdateCamera()
     {
         Vector3 targetPosition =
-            target != null ? target.position : Vector3.zero;
+            (target != null ? target.position : Vector3.zero) + panOffset;
 
         Quaternion rotation = Quaternion.Euler(pitch, yaw, 0f);
 
@@ -161,6 +166,54 @@ public class OrbitCamera : MonoBehaviour
             targetPosition + rotation * new Vector3(0, 0, -distance);
 
         transform.LookAt(targetPosition);
+    }
+
+    // Pan the camera and orbit center together in the direction of the pressed arrow.
+    void HandleKeyboardNavigation()
+    {
+        Keyboard keyboard = Keyboard.current;
+        if (keyboard == null) return;
+        if (keyboard.fKey.wasPressedThisFrame)
+        {
+            FitModel();
+            return;
+        }
+        Vector2 movement = new Vector2(
+            (keyboard.rightArrowKey.isPressed ? 1 : 0) - (keyboard.leftArrowKey.isPressed ? 1 : 0),
+            (keyboard.upArrowKey.isPressed ? 1 : 0) - (keyboard.downArrowKey.isPressed ? 1 : 0));
+        if (movement.sqrMagnitude == 0) return;
+        movement = Vector2.ClampMagnitude(movement, 1);
+        Camera camera = GetComponent<Camera>();
+        float visibleHeight = 2 * distance * Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * .5f);
+        Quaternion rotation = Quaternion.Euler(pitch, yaw, 0);
+        Vector3 screenMovement = rotation * new Vector3(movement.x, movement.y, 0);
+        panOffset += screenMovement * visibleHeight * .45f * Mathf.Min(Time.unscaledDeltaTime, .1f);
+    }
+
+    // Fit the model itself, excluding UI and camera markers, while retaining the current viewing angle.
+    public void FitModel()
+    {
+        if (IsMatchedView || IsNextBestViewPreview || viewer == null || !viewer.TryGetModelBounds(out Bounds bounds)) return;
+        Camera camera = GetComponent<Camera>();
+        camera.ResetProjectionMatrix();
+        panOffset = bounds.center - (target != null ? target.position : Vector3.zero);
+        Quaternion inverse = Quaternion.Inverse(Quaternion.Euler(pitch, yaw, 0));
+        float tangentY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * .5f);
+        float tangentX = tangentY * camera.aspect;
+        float requiredDistance = .3f;
+        for (int i = 0; i < 8; i++)
+        {
+            Vector3 corner = bounds.center + Vector3.Scale(bounds.extents,
+                new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1));
+            Vector3 local = inverse * (corner - bounds.center);
+            requiredDistance = Mathf.Max(requiredDistance,
+                Mathf.Abs(local.x) * 1.15f / tangentX - local.z,
+                Mathf.Abs(local.y) * 1.15f / tangentY - local.z,
+                camera.nearClipPlane * 1.1f - local.z);
+        }
+        distance = Mathf.Clamp(requiredDistance, .3f, 15f);
+        allowOrbit = false; dragging = false;
+        UpdateCamera();
     }
 
     void OnDisable() { EndNextBestViewPreview(); matchedView.Dispose(); }
