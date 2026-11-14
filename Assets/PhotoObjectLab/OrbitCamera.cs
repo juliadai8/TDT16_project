@@ -20,6 +20,7 @@ public class OrbitCamera : MonoBehaviour
     private readonly ColmapMatchedView matchedView = new ColmapMatchedView();
     public bool IsMatchedView => matchedView.Active;
     public bool IsNextBestViewPreview { get; private set; }
+    public bool IsAutoRotating { get; private set; }
     Vector3 nbvSavedPosition;
     Quaternion nbvSavedRotation;
     Matrix4x4 nbvSavedProjection;
@@ -29,6 +30,7 @@ public class OrbitCamera : MonoBehaviour
 
     public void PreviewNextBestView(Vector3 position, Quaternion rotation, float verticalFov)
     {
+        IsAutoRotating = false;
         if (IsMatchedView) ReturnToOrbit();
         Camera camera = GetComponent<Camera>();
         if (!IsNextBestViewPreview)
@@ -74,6 +76,7 @@ public class OrbitCamera : MonoBehaviour
     public bool TryViewCamera(ColmapCameraDisplay.CameraRecord record,Transform frame,int orientation,
                               Rect availablePixels,out string error)
     {
+        IsAutoRotating = false;
         EndNextBestViewPreview();
         allowOrbit=false;dragging=false;
         return matchedView.TryEnter(GetComponent<Camera>(),frame,record,orientation,availablePixels,out error);
@@ -118,6 +121,8 @@ public class OrbitCamera : MonoBehaviour
             return;
         }
         HandleKeyboardNavigation();
+        if (IsAutoRotating)
+            yaw = Mathf.Repeat(yaw + 10f * Mathf.Min(Time.unscaledDeltaTime, .1f), 360f);
         Mouse mouse = Mouse.current;
 
         if (mouse == null)
@@ -137,6 +142,7 @@ public class OrbitCamera : MonoBehaviour
         if (mouse.leftButton.isPressed && allowOrbit &&
             (dragging || (position-pressPosition).sqrMagnitude > 36f))
         {
+            IsAutoRotating = false;
             dragging = true;
             Vector2 delta = mouse.delta.ReadValue();
 
@@ -182,6 +188,7 @@ public class OrbitCamera : MonoBehaviour
             (keyboard.rightArrowKey.isPressed ? 1 : 0) - (keyboard.leftArrowKey.isPressed ? 1 : 0),
             (keyboard.upArrowKey.isPressed ? 1 : 0) - (keyboard.downArrowKey.isPressed ? 1 : 0));
         if (movement.sqrMagnitude == 0) return;
+        IsAutoRotating = false;
         movement = Vector2.ClampMagnitude(movement, 1);
         Camera camera = GetComponent<Camera>();
         float visibleHeight = 2 * distance * Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * .5f);
@@ -194,6 +201,7 @@ public class OrbitCamera : MonoBehaviour
     public void FitModel()
     {
         if (IsMatchedView || IsNextBestViewPreview || viewer == null || !viewer.TryGetModelBounds(out Bounds bounds)) return;
+        IsAutoRotating = false;
         Camera camera = GetComponent<Camera>();
         camera.ResetProjectionMatrix();
         panOffset = bounds.center - (target != null ? target.position : Vector3.zero);
@@ -216,5 +224,15 @@ public class OrbitCamera : MonoBehaviour
         UpdateCamera();
     }
 
-    void OnDisable() { EndNextBestViewPreview(); matchedView.Dispose(); }
+    // Move the viewer around the object, keeping the reconstruction and camera data fixed.
+    public void ToggleAutoRotation()
+    {
+        if (IsAutoRotating) { IsAutoRotating = false; return; }
+        if (IsMatchedView || IsNextBestViewPreview || viewer == null || !viewer.TryGetModelBounds(out _)) return;
+        pitch = 10f;
+        FitModel();
+        IsAutoRotating = true;
+    }
+
+    void OnDisable() { IsAutoRotating = false; EndNextBestViewPreview(); matchedView.Dispose(); }
 }

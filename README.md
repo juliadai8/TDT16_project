@@ -36,6 +36,9 @@ Keys **1–4** select the point-cloud views and the 3D mesh. **C** toggles camer
 In free orbit, **arrow keys** pan the camera in the arrow's direction, and **F** centers
 and fits the entire model while keeping the viewing angle. These controls do not
 move the camera in next-best-view preview or calibrated photo comparison.
+**Auto rotate**, above the navigation hint at the bottom, centers a close view and slowly orbits around the model (one turn
+in 36 seconds). Use **Stop rotation**, drag to orbit, arrow keys or **F** to stop.
+Scroll remains available to adjust zoom. Entering a camera preview also stops rotation.
 
 Photo comparison has three model choices (point cloud, plain mesh, textured mesh)
 and three comparison modes (model only, overlay, photo only). Overlay uses cyan

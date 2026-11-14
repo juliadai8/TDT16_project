@@ -47,6 +47,8 @@ public class BottlePointCloudViewer : MonoBehaviour
         450 +
         (currentMode == DisplayMode.MeshCoverage ? 105 : 0),Screen.height-30));
     private Vector2 controlScroll;
+    private bool ShowNavigation => orbitCamera != null && !IsMatchedView && !orbitCamera.IsNextBestViewPreview;
+    private Rect NavigationButtonRect => new Rect((Screen.width - 170) * .5f, Screen.height - 72, 170, 30);
     private Rect SelectionPanelRect => Screen.width >= 680
         ? new Rect(Screen.width-335,15,320,Mathf.Min(620,Screen.height-30))
         : new Rect(15,465,Mathf.Min(320,Screen.width-30),620);
@@ -125,6 +127,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     {
         Vector2 gui = new Vector2(screenPosition.x, Screen.height-screenPosition.y);
         return (!IsMatchedView && ControlPanelRect.Contains(gui)) ||
+            (ShowNavigation && NavigationButtonRect.Contains(gui)) ||
             (rqfDisplay != null && rqfDisplay.Visible && rqfDisplay.Panel.Contains(gui)) ||
             (cameraDisplay != null && cameraDisplay.Visible && cameraDisplay.Selected != null && SelectionPanelRect.Contains(gui));
     }
@@ -494,15 +497,21 @@ public class BottlePointCloudViewer : MonoBehaviour
         GUILayout.EndArea();
         DrawSelectedCamera();
         rqfDisplay?.Draw(orbitCamera);
-        if (orbitCamera != null && !orbitCamera.IsNextBestViewPreview)
+        if (ShowNavigation)
         {
+            Color navigationBackground = GUI.backgroundColor;
+            bool rotating = orbitCamera.IsAutoRotating;
+            if (rotating) GUI.backgroundColor = new Color(.35f, .80f, .86f);
+            if (GUI.Button(NavigationButtonRect, rotating ? "Stop rotation" : "Auto rotate"))
+                orbitCamera.ToggleAutoRotation();
+            GUI.backgroundColor = navigationBackground;
             var navigationHintStyle = new GUIStyle(GUI.skin.label)
             {
                 fontSize = 15,
                 alignment = TextAnchor.MiddleCenter
             };
             if (cameraDisplay != null && cameraDisplay.Visible)
-                GUI.Label(new Rect(0, Screen.height - 62, Screen.width, 26),
+                GUI.Label(new Rect(0, Screen.height - 102, Screen.width, 26),
                     cameraDisplay.Count + " cameras · Click one to view its photo", navigationHintStyle);
             GUI.Label(new Rect(0, Screen.height - 34, Screen.width, 26),
                 "Drag: orbit · Arrows: move · Scroll: zoom · F: fit model", navigationHintStyle);
