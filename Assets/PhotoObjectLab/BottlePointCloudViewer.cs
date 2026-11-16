@@ -36,8 +36,6 @@ public class BottlePointCloudViewer : MonoBehaviour
     private ComparisonMode comparisonMode = ComparisonMode.Overlay;
     private float overlayModelOpacity = .5f;
     private float overlayPhotoOpacity = 1f;
-    private bool showComparisonDetails;
-    private bool showSelectedCameraDetails;
     private bool IsMatchedView => orbitCamera!=null && orbitCamera.IsMatchedView;
     public Rect MatchedViewArea => Screen.width>=680
         ? new Rect(15,15,Screen.width-365,Mathf.Max(1,Screen.height-30))
@@ -49,9 +47,10 @@ public class BottlePointCloudViewer : MonoBehaviour
     private Vector2 controlScroll;
     private bool ShowNavigation => orbitCamera != null && !IsMatchedView && !orbitCamera.IsNextBestViewPreview;
     private Rect NavigationButtonRect => new Rect((Screen.width - 170) * .5f, Screen.height - 72, 170, 30);
+    private float SelectionPanelHeight => IsMatchedView ? 740 : 620;
     private Rect SelectionPanelRect => Screen.width >= 680
-        ? new Rect(Screen.width-335,15,320,Mathf.Min(620,Screen.height-30))
-        : new Rect(15,465,Mathf.Min(320,Screen.width-30),620);
+        ? new Rect(Screen.width-335,15,320,Mathf.Min(SelectionPanelHeight,Screen.height-30))
+        : new Rect(15,465,Mathf.Min(320,Screen.width-30),SelectionPanelHeight);
     private Vector2 selectionPanelScroll;
 
     private Color32[] originalColors;
@@ -557,15 +556,6 @@ public class BottlePointCloudViewer : MonoBehaviour
                 overlayModelOpacity = DrawOpacitySlider("Model opacity", overlayModelOpacity);
             }
             GUILayout.Space(6);
-            if (GUILayout.Button((showComparisonDetails ? "▾ " : "▸ ") + "Details"))
-                showComparisonDetails = !showComparisonDetails;
-            if (showComparisonDetails)
-            {
-                GUILayout.Label("COLMAP image ID: " + record.imageId);
-                GUILayout.Label("Lens-corrected photo at the registered camera pose.", wrap);
-                if (comparisonMode == ComparisonMode.Overlay)
-                    GUILayout.Label("Cyan highlights the reconstruction for shape comparison.", wrap);
-            }
             if(GUILayout.Button("Return to overview (Esc)", GUILayout.Height(28)))ReturnToOrbit();
         }
         if (imagePreview.Texture != null)
@@ -597,14 +587,17 @@ public class BottlePointCloudViewer : MonoBehaviour
         GUILayout.Space(8);
         if (imagePreview.Texture != null)
         {
-            float fullHeight = (SelectionPanelRect.width - 28) * imagePreview.Texture.height / imagePreview.Texture.width;
-            float photoHeight = Mathf.Min(fullHeight, Mathf.Max(140, SelectionPanelRect.height - 280 - (showSelectedCameraDetails ? 76 : 0)));
+            // Keep the photo size stable when the panel needs a scrollbar.
+            float imageWidth = SelectionPanelRect.width - 44;
+            float fullHeight = imageWidth * imagePreview.Texture.height / imagePreview.Texture.width;
+            float photoHeight = Mathf.Min(fullHeight, Mathf.Max(140, Mathf.Min(620, Screen.height - 30) - 280));
             Rect photo = GUILayoutUtility.GetRect(1, photoHeight, GUILayout.ExpandWidth(true));
             Color previous = GUI.color;
             GUI.color = new Color(.08f, .1f, .12f);
             GUI.DrawTexture(photo, Texture2D.whiteTexture);
             GUI.color = previous;
-            imagePreview.Draw(new Rect(photo.x + 4, photo.y + 4, photo.width - 8, photo.height - 8));
+            float drawWidth = Mathf.Min(imageWidth, photo.width - 8);
+            imagePreview.Draw(new Rect(photo.center.x - drawWidth * .5f, photo.y + 4, drawWidth, photo.height - 8));
         }
         else GUILayout.Label(imagePreview.Status ?? "Original photo not available locally.", wrap);
         GUILayout.Space(10);
@@ -614,14 +607,6 @@ public class BottlePointCloudViewer : MonoBehaviour
             ViewSelectedCamera();
         GUI.backgroundColor = buttonBackground;
         GUILayout.Space(8);
-        if (GUILayout.Button((showSelectedCameraDetails ? "▾ " : "▸ ") + "Details", GUILayout.Height(24)))
-            showSelectedCameraDetails = !showSelectedCameraDetails;
-        if (showSelectedCameraDetails)
-        {
-            GUILayout.Label("COLMAP image ID: " + record.imageId, secondary);
-            GUILayout.Label("Yellow: selected camera\nOrange: camera direction and up", secondary);
-        }
-        GUILayout.Space(4);
         GUILayout.Label("Esc to close", new GUIStyle(secondary) { alignment = TextAnchor.MiddleRight });
     }
 
