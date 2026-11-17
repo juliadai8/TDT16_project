@@ -1,0 +1,31 @@
+{
+  "source": "Reconstruction/bottle/openmvs/scene_dense.ply",
+  "source_sha256": "2ea57fcbc6b58ecbcb19c0626bc0337fc2df4c88743ba4e1adaec170f3f23048",
+  "points": 356029,
+  "displayed_points": 356029,
+  "filtering": "none",
+  "unity_bounds_min": [
+    -0.7921655041028526,
+    -0.3786286354250951,
+    -0.22908379562200926
+  ],
+  "unity_bounds_max": [
+    0.8509921948904347,
+    0.5621511857399059,
+    0.32633043502097175
+  ],
+  "alignment": {
+    "center": [
+      1.703977681787079,
+      -0.09682434342011244,
+      1.101635692495611
+    ],
+    "scale": 0.5082347104220987,
+    "axis_order": [
+      0,
+      2,
+      1
+    ]
+  },
+  "note": "Original dense measurements, not mesh vertices; no near-mesh crop."
+}

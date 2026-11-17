@@ -16,6 +16,8 @@ public class BottlePointCloudViewer : MonoBehaviour
     [Range(0.002f, 0.03f)]
     public float pointSize = 0.008f;
 
+    private BottleDenseCloudDisplay denseDisplay;
+    private string denseError;
     private Mesh mesh;
     private Material pointMaterial;
     private MeshRenderer pointCloudRenderer;
@@ -42,7 +44,7 @@ public class BottlePointCloudViewer : MonoBehaviour
         : new Rect(0,0,Mathf.Max(1,Screen.width),Mathf.Max(1,Screen.height));
 
     private Rect ControlPanelRect => new Rect(15,15,300,Mathf.Min(
-        450 +
+        550 +
         (currentMode == DisplayMode.MeshCoverage ? 105 : 0),Screen.height-30));
     private Vector2 controlScroll;
     private bool ShowNavigation => orbitCamera != null && !IsMatchedView && !orbitCamera.IsNextBestViewPreview;
@@ -64,7 +66,8 @@ public class BottlePointCloudViewer : MonoBehaviour
         TriangulationAngle,
         Mesh,
         MeshCoverage,
-        RQF
+        RQF,
+        Dense
     }
 
     private DisplayMode currentMode = DisplayMode.Original;
@@ -103,6 +106,9 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (keyboard.digit3Key.wasPressedThisFrame)
             SetMode(DisplayMode.TriangulationAngle);
+
+        if (keyboard.digit5Key.wasPressedThisFrame)
+            SetMode(DisplayMode.Dense);
 
         if (keyboard.digit4Key.wasPressedThisFrame)
             SetMode(DisplayMode.Mesh);
@@ -338,6 +344,16 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         if (currentMode == DisplayMode.RQF && mode != DisplayMode.RQF)
             orbitCamera?.EndNextBestViewPreview();
+        if (mode == DisplayMode.Dense)
+        {
+            if (denseDisplay == null) denseDisplay = new BottleDenseCloudDisplay();
+            if (!denseDisplay.TryShow(transform, out denseError))
+            {
+                Debug.LogWarning(denseError);
+                return;
+            }
+        }
+        else denseDisplay?.Hide();
         coverageDisplay?.Restore();
         rqfDisplay?.Restore();
         photoTextureDisplay?.Restore();
@@ -381,7 +397,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
         // Keep this GameObject active because it handles the UI.
         if (pointCloudRenderer != null)
-            pointCloudRenderer.enabled = !showMesh;
+            pointCloudRenderer.enabled = !showMesh && mode != DisplayMode.Dense;
 
         if (bottleMesh != null)
             bottleMesh.SetActive(showMesh);
@@ -440,7 +456,7 @@ public class BottlePointCloudViewer : MonoBehaviour
             orbitCamera.DrawMatchedMargins();
             bool overlay = comparisonMode == ComparisonMode.Overlay;
             float modelOpacity = comparisonMode == ComparisonMode.PhotoOnly ? 0 : overlay ? overlayModelOpacity : 1;
-            bool shapeComparison = currentMode == DisplayMode.Original || currentMode == DisplayMode.Mesh;
+            bool shapeComparison = currentMode == DisplayMode.Original || currentMode == DisplayMode.Dense || currentMode == DisplayMode.Mesh;
             orbitCamera.DrawPhotoComparison(imagePreview.Texture, comparisonMode != ComparisonMode.ModelOnly,
                 overlay ? overlayPhotoOpacity : 1, modelOpacity, overlay && shapeComparison);
             DrawSelectedCamera();
@@ -455,6 +471,16 @@ public class BottlePointCloudViewer : MonoBehaviour
         DrawModeButton(DisplayMode.Original,"Photo colors");
         DrawModeButton(DisplayMode.ObservationCount,"Observation count");
         DrawModeButton(DisplayMode.TriangulationAngle,"Triangulation angle");
+        GUILayout.Space(10);
+        GUILayout.Label("Dense point cloud", new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold });
+        DrawModeButton(DisplayMode.Dense, "Dense photo colors");
+        if (currentMode == DisplayMode.Dense && denseDisplay != null)
+        {
+            GUILayout.Label(denseDisplay.Count.ToString("N0") + " original OpenMVS points");
+            GUILayout.Label("Point size (display only)");
+            denseDisplay.SetPointRadius(GUILayout.HorizontalSlider(denseDisplay.PointRadius, .0005f, .008f));
+        }
+        if (!string.IsNullOrEmpty(denseError)) GUILayout.Label(denseError);
         GUILayout.Space(10);
         GUILayout.Label("Surface model",new GUIStyle(GUI.skin.label){fontStyle=FontStyle.Bold});
         DrawSurfaceButton("Plain mesh", false);
@@ -539,7 +565,10 @@ public class BottlePointCloudViewer : MonoBehaviour
             GUILayout.Space(8);
             GUILayout.Label("Model", heading);
             GUILayout.BeginHorizontal();
-            DrawComparisonModelButton("Point cloud", DisplayMode.Original, false);
+            DrawComparisonModelButton("Sparse cloud", DisplayMode.Original, false);
+            DrawComparisonModelButton("Dense cloud", DisplayMode.Dense, false);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
             DrawComparisonModelButton("Plain mesh", DisplayMode.Mesh, false);
             DrawComparisonModelButton("Textured mesh", DisplayMode.Mesh, true);
             GUILayout.EndHorizontal();
@@ -656,6 +685,7 @@ public class BottlePointCloudViewer : MonoBehaviour
         imagePreview.Dispose();
         cameraDisplay?.Dispose();
         coverageDisplay?.Dispose();
+        denseDisplay?.Dispose();
         if (mesh != null)
             Destroy(mesh);
 
