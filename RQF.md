@@ -99,10 +99,8 @@ rather than in the viewer panel.
 - **Combined RQF:** the published multiplicative combination of all four.
 
 Red indicates higher need, green lower need, gray unavailable transfer/value.
-Observed-range color contrast is on by default so small variations remain visible.
-The displayed numeric color range changes with the filter; this contrast does
-not modify RQF values, proposal rankings or the component normalizations. Disable
-it for a fixed 0-to-1 color scale.
+The default color scale is fixed at 0 to 1. Optional observed-range contrast
+makes small variations more visible without changing scores or proposal rankings.
 
 Gold marks the single recommended camera, with a compact frustum and camera body.
 Cyan dots mark surface samples within 12% of the mesh bounds diagonal of the target,
@@ -136,17 +134,25 @@ It is an adapted planning/diagnostic demonstrator, not a full autonomous capture
 and reconstruction loop. Improvements to actual reconstruction must be tested
 by acquiring/selecting additional images and reconstructing again.
 
+The active cleaned reconstruction uses 988 × 741 depth maps at OpenMVS
+resolution level 2, with ROI cropping disabled. It has 398,813 cleaned dense points
+and a 180,648-vertex / 361,266-triangle mesh. RQF uses 4,804 samples. Fixed
+normalization statistics, density radius and working distance from the first
+analysis are retained in `Reconstruction/bottle/rqf_reference_normalization.json`.
+The 1600-pixel image limit above applies only to texture need analysis; the
+photo-textured display uses a separate 4096 × 4096 atlas from level-0 texturing.
+
 ## Generation
 
 From the Unity project root:
 
 ```sh
-python3 Reconstruction/rqf_metrics.py --samples 5000
+python3 Reconstruction/rqf_metrics.py --samples 5000 --reference-report Reconstruction/bottle/rqf_reference_normalization.json
 ```
 
-Requirements: Python with NumPy, SciPy, Pillow, and a C++17 compiler on PATH.
-The tiny CPU raycaster is compiled to the system temporary directory and rebuilt
-when its source changes. No network packages are downloaded by the generator.
+Requirements: Python with NumPy, SciPy and Pillow. On Windows, install trimesh
+and embreex for raycasting. Other platforms use a C++17 compiler on PATH; the
+small raycaster is built in the temporary directory. The generator downloads no packages.
 Camera parameters and original images must be present in `Reconstruction/bottle`.
 
 Outputs to commit with their Unity .meta files:

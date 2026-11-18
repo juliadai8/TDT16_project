@@ -1,0 +1,24 @@
+{
+  "source": "C:\\Users\\julia\\TDT16_project\\Reconstruction\\bottle\\openmvs\\scene_dense_mesh.ply",
+  "source_sha256": "d60342265d1f15c65bfbb6d4a4716203656706e42a043927ffc7c7ba344385b1",
+  "vertices": 180648,
+  "triangles": 361266,
+  "connected_components_before": 1,
+  "removed_component_vertices": 0,
+  "boundary_edges": 28,
+  "nonmanifold_edges": 0,
+  "world_height_range": [
+    -0.2892609315860707,
+    1.6404228855920233
+  ],
+  "vertices_below_old_bottom": 18439,
+  "meshing": {
+    "crop_to_roi": false,
+    "integrate_only_roi": false,
+    "close_holes": 0,
+    "smooth": 1,
+    "remove_spurious": 20,
+    "remove_spikes": true
+  },
+  "note": "Largest connected surface exported. Original model and RQF results remain separate. An inferred or closed surface is not evidence that the hidden underside was photographed."
+}

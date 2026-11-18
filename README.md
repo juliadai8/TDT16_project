@@ -17,11 +17,17 @@ The supplied mesh and precomputed analysis data can be viewed without Python,
 COLMAP or OpenMVS installed. Original-photo previews require the corresponding
 image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COLMAP_CAMERAS_README.txt).
 
+The active reconstruction uses uncropped OpenMVS depth maps at 988 × 741 pixels
+(`--resolution-level 2`). After background/table filtering it contains 398,813 dense
+points, 180,648 mesh vertices and 361,266 triangles. All surface views and RQF
+use this cleaned reconstruction. The underside remains open.
+
 ## Explore the reconstruction
 
 - **Photo colors:** the sparse point cloud with its reconstructed colors.
 - **Observation count:** the number of image observations supporting each sparse point.
 - **Triangulation angle:** the camera geometry supporting each sparse point.
+- **Dense photo colors:** the cleaned dense point cloud.
 - **Plain mesh:** the reconstructed surface with soft, camera-relative inspection
   shading. Ambient fill and gentle front lighting reveal shape without a dark
   side from the scene lamp; this shading does not indicate reconstruction quality.
@@ -40,7 +46,7 @@ move the camera in next-best-view preview or calibrated photo comparison.
 in 36 seconds). Use **Stop rotation**, drag to orbit, arrow keys or **F** to stop.
 Scroll remains available to adjust zoom. Entering a camera preview also stops rotation.
 
-Photo comparison has three model choices (point cloud, plain mesh, textured mesh)
+Photo comparison has four model choices (sparse cloud, dense cloud, plain mesh, textured mesh)
 and three comparison modes (model only, overlay, photo only). Overlay uses cyan
 tint with separate photo- and model-opacity sliders. Camera details are collapsed, and the source
 photo remains visible below the controls.
@@ -52,7 +58,7 @@ preview, making the bottle's photographic pattern available as an orientation ai
 
 The photo texture was generated with OpenMVS TextureMesh from the existing 73
 calibrated views. It uses a 4096 × 4096 atlas; UV seams add display vertices, while
-the original mesh remains the input to RQF. Lighting, reflections and patch seams
+the cleaned mesh remains the input to RQF. Lighting, reflections and patch seams
 remain in the texture. It does not repair missing or incorrect geometry.
 
 To regenerate the Unity texture export after running TextureMesh, use
@@ -70,7 +76,7 @@ https://doi.org/10.1007/s11042-025-20596-6
 
 It combines camera coverage, local point density, distance to open reconstruction
 edges and image-gradient-based texture information using the published RQF formula
-with alpha = 2. The supplied export analyzes 4,799 samples using 73 calibrated photos.
+with alpha = 2. The supplied export analyzes 4,804 samples using 73 calibrated photos.
 Camera proposals target high-RQF points and are placed along their surface normals.
 
 Our boundary detection uses topologically open edges on the existing OpenMVS mesh,

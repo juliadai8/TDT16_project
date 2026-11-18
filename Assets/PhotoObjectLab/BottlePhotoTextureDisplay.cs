@@ -4,7 +4,7 @@ using System.Security.Cryptography;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-// The photo-textured display mesh is temporary. RQF always uses the original mesh.
+// The photo-textured display mesh is temporary. RQF uses the untextured analysis mesh.
 public sealed class BottlePhotoTextureDisplay : IDisposable
 {
     MeshFilter filter;

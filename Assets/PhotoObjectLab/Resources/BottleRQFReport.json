@@ -2,16 +2,16 @@
   "method": "RQF (Neumann et al., 2025), sampled OpenMVS adaptation",
   "doi": "10.1007/s11042-025-20596-6",
   "alpha": 2,
-  "samples": 4799,
+  "samples": 4804,
   "registered_cameras": 73,
-  "dense_points_near_mesh": 331748,
-  "mesh_vertices": 166953,
-  "mesh_triangles": 333861,
-  "boundary_vertices": 43,
+  "dense_points_near_mesh": 375470,
+  "mesh_vertices": 180648,
+  "mesh_triangles": 361266,
+  "boundary_vertices": 28,
   "nonmanifold_edges": 0,
   "boundary_classifier": "topological open boundaries: edges incident to exactly one triangle",
-  "texture_unknown_samples": 1,
-  "unassigned_vertices": 2926,
+  "texture_unknown_samples": 3,
+  "unassigned_vertices": 4108,
   "density_radius_source_units": 0.04130404368234521,
   "spatial_min_neighbors": 16,
   "working_distance_source_units": 4.3091872422026185,
@@ -35,48 +35,53 @@
       "std": 0.010188937287775349
     }
   },
-  "sample_snap_distance_p95": 0.009201363011192926,
+  "sample_snap_distance_p95": 0.009878816593338393,
   "raw_ranges": {
     "coverage": [
       0.0,
-      50.0
+      46.0
     ],
     "density": [
-      5.0,
-      509.0
+      6.0,
+      532.0
     ],
     "edge": [
-      0.002878901641565605,
-      3.163516442231116
+      0.006794350834822095,
+      3.7036218761729405
     ],
     "texture": [
-      0.0037956427840981632,
-      0.0768078398560324
+      0.004262499821682771,
+      0.08987950779497623
     ]
   },
   "metric_ranges": {
     "coverage": [
-      0.00018940594382518605,
-      0.36090725483714875
+      0.0005936828595093563,
+      0.5
     ],
     "density": [
-      0.0016519047355461054,
-      0.9570064274793337
+      0.0009503387936209161,
+      0.9729888571053789
     ],
     "edge": [
-      0.016069030008238235,
-      0.9712569636810334
+      0.004231334048314494,
+      0.9667712794833082
     ],
     "texture": [
-      1.4747728055331624e-05,
-      0.8178360622270899
+      1.1334290963959416e-06,
+      0.852299024178251
     ],
     "rqf": [
-      0.013338259132054588,
-      0.28853105334876467
+      0.01291506046409472,
+      0.29572165787432747
     ]
   },
-  "mesh_sha256": "bb637dfbdf6ccfb4fb63c2f0ecbad0293ce9b29a128534a31fe9c467b5188644",
+  "mesh_sha256": "d60342265d1f15c65bfbb6d4a4716203656706e42a043927ffc7c7ba344385b1",
+  "mesh_source": "C:/Users/julia/TDT16_project/Reconstruction/bottle/openmvs/scene_dense_mesh.ply",
+  "dense_source": "C:/Users/julia/TDT16_project/Reconstruction/bottle/openmvs/scene_dense.ply",
+  "dense_sha256": "4df033f56ba2336a702c59cd34216e446975064ea221bb9a56272186ae2cba6b",
+  "normalization_reference": "C:\\Users\\julia\\TDT16_project\\Reconstruction\\bottle\\rqf_reference_normalization.json",
+  "raycaster_backend": "Embree on Windows; original C++ BVH on other platforms",
   "image_fingerprints": [
     {
       "name": "IMG_5583.jpeg",
@@ -380,5 +385,15 @@
     "16-neighbor spatial minimum on samples (configurable)",
     "working distance estimated from camera poses unless supplied",
     "fixed reconstruction; no simulated metric updates"
-  ]
+  ],
+  "depth_map_size": [
+    988,
+    741
+  ],
+  "original_depth_map_size": [
+    988,
+    741
+  ],
+  "resolution_level": 2,
+  "original_resolution_evidence": "User supplied original OpenMVS log resolution and --resolution-level 2"
 }

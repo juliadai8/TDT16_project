@@ -7,6 +7,11 @@ using UnityEngine.Rendering;
 // Displays original OpenMVS measurements in the same local coordinates as the sparse cloud.
 public sealed class BottleDenseCloudDisplay : IDisposable
 {
+    private readonly string resourceName;
+    public BottleDenseCloudDisplay(string resourceName = "BottleDenseCloud")
+    {
+        this.resourceName = resourceName;
+    }
     private GameObject root;
     private Material material;
     private readonly List<Mesh> meshes = new List<Mesh>();
@@ -17,7 +22,7 @@ public sealed class BottleDenseCloudDisplay : IDisposable
     {
         error = null;
         if (root != null) { root.SetActive(true); return true; }
-        TextAsset asset = Resources.Load<TextAsset>("BottleDenseCloud");
+        TextAsset asset = Resources.Load<TextAsset>(resourceName);
         if (asset == null) { error = "Dense cloud is missing. Run export_dense_cloud_to_unity.py."; return false; }
         Shader shader = Shader.Find("Custom/PointCloudVertexColor");
         if (shader == null) { error = "Point cloud shader is missing."; return false; }
@@ -33,7 +38,7 @@ public sealed class BottleDenseCloudDisplay : IDisposable
                 Count = (int)count;
                 material = new Material(shader);
                 material.SetFloat("_PointSize", PointRadius);
-                root = new GameObject("OpenMVS Dense Point Cloud");
+                root = new GameObject(resourceName);
                 root.transform.SetParent(parent, false);
                 // Chunking bounds memory allocations and avoids oversized index buffers.
                 for (int first = 0; first < Count; first += 50000)

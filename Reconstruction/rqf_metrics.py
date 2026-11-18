@@ -102,6 +102,15 @@ class Raycaster:
             raise ValueError("Expected triangle geometry")
         if not len(faces) or np.min(faces) < 0 or np.max(faces) >= len(vertices) or not np.isfinite(vertices).all():
             raise ValueError("Invalid raycast geometry")
+        self.backend = "cpp"
+        if platform.system() == "Windows":
+            import trimesh
+            from trimesh.ray.ray_pyembree import RayMeshIntersector
+            self.backend = "embree"
+            self.mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+            self.intersector = RayMeshIntersector(self.mesh)
+            self.handle = None
+            return
         source = Path(__file__).with_name("rqf_raycast.cpp")
         digest = hashlib.sha256(source.read_bytes()).hexdigest()[:12]
         suffix = ".dylib" if platform.system() == "Darwin" else ".so"
@@ -125,12 +134,27 @@ class Raycaster:
     def cast(self, origins, targets):
         targets = np.ascontiguousarray(targets, np.float64)
         origins = np.ascontiguousarray(np.broadcast_to(origins, targets.shape), np.float64)
+        if self.backend == "embree":
+            result = np.full(len(targets), np.inf)
+            delta = targets - origins
+            lengths = np.linalg.norm(delta, axis=1)
+            valid = np.flatnonzero(lengths > 1e-12)
+            if len(valid):
+                hit, ray, _ = self.intersector.intersects_location(origins[valid], delta[valid] / lengths[valid, None], multiple_hits=False)
+                distance = np.linalg.norm(hit - origins[valid[ray]], axis=1)
+                within = distance <= lengths[valid[ray]] + .001 * np.maximum(1., lengths[valid[ray]])
+                result[valid[ray[within]]] = distance[within]
+            return result
         result = np.empty(len(targets), np.float64)
         self.lib.rqf_bvh_cast(self.handle, origins.ctypes.data, targets.ctypes.data, len(targets), result.ctypes.data)
         return result
 
     # Release the raycaster resources after analysis.
     def close(self):
+        if self.backend == "embree":
+            self.intersector = None
+            self.mesh = None
+            return
         if self.handle:
             self.lib.rqf_bvh_destroy(self.handle)
             self.handle = None
@@ -269,11 +293,15 @@ def vec(v):
 # Run the offline analysis and export surface indicators and camera suggestions for Unity.
 def export(args):
     base = args.project / "Reconstruction/bottle"
-    out = args.project / "Assets/PhotoObjectLab/Resources"
+    out = args.output_dir or args.project / "Assets/PhotoObjectLab/Resources"
+    mesh_path = args.mesh or base / "openmvs/scene_dense_mesh.ply"
+    dense_path = args.dense or base / "openmvs/scene_dense.ply"
+    reference = json.loads(args.reference_report.read_text()) if args.reference_report else None
+    prefix = args.prefix
     # Load the existing reconstruction and select cloud points close to its mesh.
     print("Loading OpenMVS mesh and dense cloud...", flush=True)
-    vertices, _, faces = read_ply(base / "openmvs/scene_dense_mesh.ply")
-    dense, _, _ = read_ply(base / "openmvs/scene_dense.ply")
+    vertices, _, faces = read_ply(mesh_path)
+    dense, _, _ = read_ply(dense_path)
     if faces is None:
         raise ValueError("No mesh triangles")
     extent = float(np.max(np.ptp(vertices, axis=0)))
@@ -296,7 +324,7 @@ def export(args):
     dense_tree = cKDTree(dense)
     spacing = dense_tree.query(dense, k=2, workers=1)[0][:, 1]
     spacing = spacing[spacing > 0]
-    density_radius = float(args.density_radius or 10 * np.mean(spacing))
+    density_radius = float(args.density_radius or (reference["density_radius_source_units"] if reference else 10 * np.mean(spacing)))
     density = dense_tree.query_ball_point(original_points, density_radius, return_length=True, workers=1).astype(float)
     borders, nonmanifold = boundary_vertices(vertices, faces)
     edge_distance = cKDTree(vertices[borders]).query(points)[0] if len(borders) else np.full(len(points), np.inf)
@@ -333,12 +361,15 @@ def export(args):
         if neighbors.ndim == 1:
             neighbors = neighbors[:, None]
         coverage_norm, coverage_params = poor_logistic(counts, 20, 7)
-        density_norm, density_params = poor_logistic(density)
+        def normalize(values, name):
+            parameters = reference["normalizations"][name] if reference else {}
+            return poor_logistic(values, parameters.get("mean"), parameters.get("std"))
+        density_norm, density_params = normalize(density, "density")
         if len(borders):
-            edge_norm, edge_params = poor_logistic(edge_distance)
+            edge_norm, edge_params = normalize(edge_distance, "edge")
         else:
             edge_norm, edge_params = np.zeros(len(points)), {"mean": None, "std": None}
-        texture_norm, texture_params = poor_logistic(saliency)
+        texture_norm, texture_params = normalize(saliency, "texture")
         # Aggregate each indicator locally before combining them into one RQF score per point.
         components = np.column_stack([spatial_min(x, neighbors) for x in
                                       (coverage_norm, density_norm, edge_norm, texture_norm)])
@@ -347,7 +378,7 @@ def export(args):
         # Generate spaced camera suggestions aimed at high-RQF targets along their normals.
         # Rank by target need, not by predicted improvement over the entire camera image.
         centers = np.array([c[4] for c in cameras])
-        working_distance = float(args.working_distance or np.median(np.linalg.norm(centers - vertices.mean(axis=0), axis=1)))
+        working_distance = float(args.working_distance or (reference["working_distance_source_units"] if reference else np.median(np.linalg.norm(centers - vertices.mean(axis=0), axis=1))))
         proposals = []
         kept_targets = []
         rejected = 0
@@ -396,11 +427,13 @@ def export(args):
     out.mkdir(parents=True, exist_ok=True)
     header = struct.pack("<4s4I", b"RQF1", 1, len(vertices), len(points), len(cameras))
     binary = header + to_unity(vertices).astype("<f4").tobytes() + mapped.astype("<f4").tobytes() + sample_export.astype("<f4").tobytes()
-    (out / "BottleRQF.bytes").write_bytes(binary)
+    (out / (prefix + ".bytes")).write_bytes(binary)
     poses = [{"sample": i, "position": vec(to_unity(pos)), "target": vec(to_unity(target)), "priority": float(rqf[i]),
               "verticalFov": 50, "aspect": 4/3} for i, pos, target in proposals]
-    (out / "BottleRQFViews.json").write_text(json.dumps({"version": 1, "proposals": poses}, indent=2))
-    np.savez_compressed(base / "rqf_analysis.npz", points=points, normals=normals, values=values,
+    (out / (prefix + "Views.json")).write_text(json.dumps({"version": 1, "proposals": poses}, indent=2))
+    analysis_path = args.analysis_output or base / ("rqf_analysis.npz" if prefix == "BottleRQF" else prefix + "_analysis.npz")
+    analysis_path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(analysis_path, points=points, normals=normals, values=values,
                         counts=counts, density=density, edge_distance=edge_distance, saliency=saliency, visibility=visibility)
     # Record the inputs, settings, results and adaptations needed to interpret this export.
     report = {
@@ -416,13 +449,17 @@ def export(args):
         "raw_ranges": {k: [float(np.nanmin(a[np.isfinite(a)])), float(np.nanmax(a[np.isfinite(a)]))] if np.isfinite(a).any() else None
                        for k, a in zip(NAMES[:4], [counts, density, edge_distance, saliency])},
         "metric_ranges": {k: [float(np.nanmin(values[:, j])), float(np.nanmax(values[:, j]))] for j, k in enumerate(NAMES)},
-        "mesh_sha256": hashlib.sha256((base / "openmvs/scene_dense_mesh.ply").read_bytes()).hexdigest(),
+        "mesh_sha256": hashlib.sha256(mesh_path.read_bytes()).hexdigest(),
+        "mesh_source": str(mesh_path.resolve()), "dense_source": str(dense_path.resolve()),
+        "dense_sha256": hashlib.sha256(dense_path.read_bytes()).hexdigest(),
+        "normalization_reference": str(args.reference_report.resolve()) if args.reference_report else None,
+        "raycaster_backend": "Embree on Windows; original C++ BVH on other platforms",
         "image_fingerprints": image_fingerprints,
         "adaptations": ["OpenMVS mesh instead of new Poisson mesh", "topological boundaries instead of angle-sum classifier",
                         "sampled dense cloud, snapped to nearest local triangles for visibility", "CPU BVH instead of GPU point renderer",
                         "7x7 gradient windows at image max side 1600", "16-neighbor spatial minimum on samples (configurable)",
                         "working distance estimated from camera poses unless supplied", "fixed reconstruction; no simulated metric updates"]}
-    (out / "BottleRQFReport.json").write_text(json.dumps(report, indent=2))
+    (out / (prefix + "Report.json")).write_text(json.dumps(report, indent=2))
     print(json.dumps({k: v for k, v in report.items() if k not in ["image_fingerprints", "adaptations"]}, indent=2), flush=True)
 
 
@@ -430,6 +467,12 @@ def export(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path, default=Path(__file__).resolve().parent.parent)
+    parser.add_argument("--mesh", type=Path)
+    parser.add_argument("--dense", type=Path)
+    parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--prefix", default="BottleRQF")
+    parser.add_argument("--analysis-output", type=Path)
+    parser.add_argument("--reference-report", type=Path)
     parser.add_argument("--samples", type=int, default=5000)
     parser.add_argument("--neighbors", type=int, default=16)
     parser.add_argument("--density-radius", type=float)

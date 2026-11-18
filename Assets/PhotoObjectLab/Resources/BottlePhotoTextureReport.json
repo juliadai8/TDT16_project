@@ -1,14 +1,14 @@
 {
   "method": "OpenMVS TextureMesh 2.4.0 photo texture atlas",
-  "source_vertices": 166953,
-  "display_vertices_at_uv_seams": 198383,
-  "triangles": 333861,
+  "source_vertices": 180648,
+  "display_vertices_at_uv_seams": 214577,
+  "triangles": 361266,
   "texture_size": [
     4096,
     4096
   ],
   "triangle_connectivity_unchanged": true,
-  "source_mesh_sha256": "bb637dfbdf6ccfb4fb63c2f0ecbad0293ce9b29a128534a31fe9c467b5188644",
+  "source_mesh_sha256": "d60342265d1f15c65bfbb6d4a4716203656706e42a043927ffc7c7ba344385b1",
   "options": {
     "decimate": 1,
     "close_holes": 0,

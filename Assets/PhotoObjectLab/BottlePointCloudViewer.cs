@@ -17,6 +17,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     public float pointSize = 0.008f;
 
     private BottleDenseCloudDisplay denseDisplay;
+    private bool IsDenseMode => currentMode == DisplayMode.Dense;
     private string denseError;
     private Mesh mesh;
     private Material pointMaterial;
@@ -24,6 +25,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     private BottleMeshCoverageDisplay coverageDisplay;
     private string coverageError;
     private RqfDisplay rqfDisplay;
+    private bool IsRqfMode => currentMode == DisplayMode.RQF;
     private string rqfError;
     private BottlePhotoTextureDisplay photoTextureDisplay;
     private bool showPhotoTexture = true;
@@ -38,6 +40,7 @@ public class BottlePointCloudViewer : MonoBehaviour
     private ComparisonMode comparisonMode = ComparisonMode.Overlay;
     private float overlayModelOpacity = .5f;
     private float overlayPhotoOpacity = 1f;
+    private bool overlayCyanTint = true;
     private bool IsMatchedView => orbitCamera!=null && orbitCamera.IsMatchedView;
     public Rect MatchedViewArea => Screen.width>=680
         ? new Rect(15,15,Screen.width-365,Mathf.Max(1,Screen.height-30))
@@ -61,16 +64,10 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     private enum DisplayMode
     {
-        Original,
-        ObservationCount,
-        TriangulationAngle,
-        Mesh,
-        MeshCoverage,
-        RQF,
-        Dense
+        Original, ObservationCount, TriangulationAngle, Mesh, MeshCoverage, RQF, Dense
     }
 
-    private DisplayMode currentMode = DisplayMode.Original;
+    private DisplayMode currentMode = DisplayMode.Mesh;
 
     void Start()
     {
@@ -185,7 +182,7 @@ public class BottlePointCloudViewer : MonoBehaviour
 
     void SetCamerasVisible(bool visible)
     {
-        if (visible && currentMode == DisplayMode.RQF) SetMode(DisplayMode.Mesh);
+        if (visible && IsRqfMode) SetMode(DisplayMode.Mesh);
         if(IsMatchedView)ReturnToOrbit();
         if (cameraDisplay == null) cameraDisplay = new ColmapCameraDisplay();
         if (!cameraDisplay.TrySetVisible(transform, visible, out cameraError))
@@ -456,9 +453,9 @@ public class BottlePointCloudViewer : MonoBehaviour
             orbitCamera.DrawMatchedMargins();
             bool overlay = comparisonMode == ComparisonMode.Overlay;
             float modelOpacity = comparisonMode == ComparisonMode.PhotoOnly ? 0 : overlay ? overlayModelOpacity : 1;
-            bool shapeComparison = currentMode == DisplayMode.Original || currentMode == DisplayMode.Dense || currentMode == DisplayMode.Mesh;
+            bool shapeComparison = currentMode == DisplayMode.Original || IsDenseMode || currentMode == DisplayMode.Mesh;
             orbitCamera.DrawPhotoComparison(imagePreview.Texture, comparisonMode != ComparisonMode.ModelOnly,
-                overlay ? overlayPhotoOpacity : 1, modelOpacity, overlay && shapeComparison);
+                overlay ? overlayPhotoOpacity : 1, modelOpacity, overlay && shapeComparison && overlayCyanTint);
             DrawSelectedCamera();
             return;
         }
@@ -473,12 +470,13 @@ public class BottlePointCloudViewer : MonoBehaviour
         DrawModeButton(DisplayMode.TriangulationAngle,"Triangulation angle");
         GUILayout.Space(10);
         GUILayout.Label("Dense point cloud", new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold });
-        DrawModeButton(DisplayMode.Dense, "Dense photo colors");
-        if (currentMode == DisplayMode.Dense && denseDisplay != null)
+        DrawModeButton(DisplayMode.Dense, "Photo colors");
+        if (IsDenseMode && denseDisplay != null)
         {
-            GUILayout.Label(denseDisplay.Count.ToString("N0") + " original OpenMVS points");
+            BottleDenseCloudDisplay activeDense = denseDisplay;
+            GUILayout.Label(activeDense.Count.ToString("N0") + " OpenMVS points");
             GUILayout.Label("Point size (display only)");
-            denseDisplay.SetPointRadius(GUILayout.HorizontalSlider(denseDisplay.PointRadius, .0005f, .008f));
+            activeDense.SetPointRadius(GUILayout.HorizontalSlider(activeDense.PointRadius, .0005f, .008f));
         }
         if (!string.IsNullOrEmpty(denseError)) GUILayout.Label(denseError);
         GUILayout.Space(10);
@@ -581,6 +579,7 @@ public class BottlePointCloudViewer : MonoBehaviour
             GUILayout.EndHorizontal();
             if (comparisonMode == ComparisonMode.Overlay)
             {
+                overlayCyanTint = GUILayout.Toggle(overlayCyanTint, "Cyan tint on model");
                 overlayPhotoOpacity = DrawOpacitySlider("Photo opacity", overlayPhotoOpacity);
                 overlayModelOpacity = DrawOpacitySlider("Model opacity", overlayModelOpacity);
             }

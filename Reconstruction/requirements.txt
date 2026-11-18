@@ -3,3 +3,6 @@ scipy>=1.12
 scikit-image>=0.23
 trimesh>=4.0
 Pillow>=10.0
+
+# Windows CPU raycasting without a local C++ compiler
+embreex>=4.4; platform_system == "Windows"

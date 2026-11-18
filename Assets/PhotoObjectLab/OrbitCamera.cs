@@ -94,6 +94,7 @@ public class OrbitCamera : MonoBehaviour
     void Start()
     {
         viewer = FindAnyObjectByType<BottlePointCloudViewer>();
+        FitModel();
         UpdateCamera();
     }
 

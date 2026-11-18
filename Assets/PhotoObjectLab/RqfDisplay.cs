@@ -22,6 +22,7 @@ public sealed class RqfDisplay : IDisposable
         public float observations, density, edgeDistance, texture;
     }
     static readonly string[] Names = { "Coverage need", "Density need", "Boundary need", "Texture need", "Combined RQF" };
+    const string resourcePrefix = "BottleRQF";
     MeshFilter filter;
     MeshRenderer renderer;
     Mesh original, colored, markerMesh, targetMesh;
@@ -40,7 +41,7 @@ public sealed class RqfDisplay : IDisposable
     Proposal[] proposals;
     List<Proposal> reachable = new List<Proposal>();
     int selectedFilter = 4, proposalIndex;
-    bool shown, showCamera = true, includeBelow, contrast = true;
+    bool shown, showCamera = true, includeBelow, contrast = false;
     bool showHeatmap = true, showFocus = true, showRays = true;
     float minimumY;
     Vector2 scroll;
@@ -89,8 +90,8 @@ public sealed class RqfDisplay : IDisposable
         renderer = filter.GetComponent<MeshRenderer>();
         original = filter.sharedMesh; originalMaterials = renderer.sharedMaterials;
         FindDisplayAxis();
-        var binary = Resources.Load<TextAsset>("BottleRQF");
-        var views = Resources.Load<TextAsset>("BottleRQFViews");
+        var binary = Resources.Load<TextAsset>(resourcePrefix);
+        var views = Resources.Load<TextAsset>(resourcePrefix + "Views");
         if (binary == null || views == null)
             throw new FileNotFoundException("Run python Reconstruction/rqf_metrics.py first.");
         using (var reader = new BinaryReader(new MemoryStream(binary.bytes)))
@@ -368,6 +369,12 @@ public sealed class RqfDisplay : IDisposable
         DrawSurfaceViewButton("Heatmap", true);
         DrawSurfaceViewButton("Photo texture", false);
         GUILayout.EndHorizontal();
+        bool highlight = GUILayout.Toggle(showFocus, "Show cyan/blue target highlight");
+        if (highlight != showFocus)
+        {
+            showFocus = highlight;
+            targetRoot.SetActive(showFocus);
+        }
         if (showHeatmap)
         {
             GUILayout.Space(8);
@@ -434,20 +441,20 @@ public sealed class RqfDisplay : IDisposable
         showAdvanced=Section("Display settings",showAdvanced);
         if(showAdvanced)
         {
-            bool focus=GUILayout.Toggle(showFocus,"Surface target marker");
             bool rays=GUILayout.Toggle(showRays,"Camera-to-target line");
-            bool refresh=focus!=showFocus||rays!=showRays;
-            showFocus=focus;showRays=rays;targetRoot.SetActive(showFocus);
-            if(refresh)UpdateMarker();
+            if(rays!=showRays){showRays=rays;UpdateMarker();}
             bool display=GUILayout.Toggle(showCamera,"Show camera marker");
             if(display!=showCamera){showCamera=display;UpdateMarker();}
             bool requestedContrast=GUILayout.Toggle(contrast,"Enhance heatmap contrast");
             if(requestedContrast!=contrast){contrast=requestedContrast;ApplyPalette();}
+            if (contrast) GUILayout.Label("Contrast changes the colors only; scores and suggestions stay the same.", wrap);
             bool below=GUILayout.Toggle(includeBelow,"Allow below-object poses");
             if(below!=includeBelow){orbit?.EndNextBestViewPreview();includeBelow=below;UpdateReachable();}
             GUILayout.Label("Below-object poses may require moving or turning the bottle.",wrap);
         }
-        if(!string.IsNullOrEmpty(GUI.tooltip))GUILayout.Label(GUI.tooltip,wrap);
+        // Tooltip text changes during repaint; allocate its control on every GUI event.
+        // Conditionally adding it only on hover breaks the cached GUILayout control tree.
+        GUILayout.Label(GUI.tooltip ?? string.Empty, wrap, GUILayout.MinHeight(36));
         GUILayout.EndScrollView();GUILayout.EndArea();
     }
 

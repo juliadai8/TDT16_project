@@ -1,18 +1,18 @@
 {
-  "source": "Reconstruction/bottle/openmvs/scene_dense.ply",
-  "source_sha256": "2ea57fcbc6b58ecbcb19c0626bc0337fc2df4c88743ba4e1adaec170f3f23048",
-  "points": 356029,
-  "displayed_points": 356029,
-  "filtering": "none",
+  "source": "C:\\Users\\julia\\TDT16_project\\Reconstruction\\bottle\\openmvs\\scene_dense.ply",
+  "source_sha256": "4df033f56ba2336a702c59cd34216e446975064ea221bb9a56272186ae2cba6b",
+  "points": 398813,
+  "displayed_points": 398813,
+  "filtering": "See bottle_clean.filter.json: local bottle envelope, table-plane/normal separation, statistical outliers.",
   "unity_bounds_min": [
-    -0.7921655041028526,
-    -0.3786286354250951,
-    -0.22908379562200926
+    -0.7946342367380628,
+    -0.37531906341590837,
+    -0.229493964864577
   ],
   "unity_bounds_max": [
-    0.8509921948904347,
-    0.5621511857399059,
-    0.32633043502097175
+    1.0624691553832861,
+    0.6232270217883074,
+    0.35768133029500926
   ],
   "alignment": {
     "center": [
@@ -27,5 +27,10 @@
       1
     ]
   },
-  "note": "Original dense measurements, not mesh vertices; no near-mesh crop."
+  "note": "Original dense measurements, not mesh vertices; no near-mesh crop.",
+  "depth_map_size": [
+    988,
+    741
+  ],
+  "resolution_level": 2
 }

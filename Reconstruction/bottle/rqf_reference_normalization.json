@@ -1,0 +1,23 @@
+{
+  "normalizations": {
+    "coverage": {
+      "mean": 20.0,
+      "std": 7.0
+    },
+    "density": {
+      "mean": 242.91539904146697,
+      "std": 83.09725577840594
+    },
+    "edge": {
+      "mean": 1.5128499490854108,
+      "std": 0.8023339576294612
+    },
+    "texture": {
+      "mean": 0.020134898387714244,
+      "std": 0.010188937287775349
+    }
+  },
+  "density_radius_source_units": 0.04130404368234521,
+  "working_distance_source_units": 4.3091872422026185,
+  "purpose": "Fixed normalization from the first analysis; retained for reproducible scores."
+}
