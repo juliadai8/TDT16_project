@@ -102,15 +102,15 @@ Red indicates higher need, green lower need, gray unavailable transfer/value.
 The default color scale is fixed at 0 to 1. Optional observed-range contrast
 makes small variations more visible without changing scores or proposal rankings.
 
-Gold marks the single recommended camera, with a compact frustum and camera body.
-Cyan dots mark surface samples within 12% of the mesh bounds diagonal of the target,
-inside the proposed camera's image and verified visible by mesh raycast. A cyan
-cross marks the exact target. Up to eight spaced rays connect the camera to this
-neighborhood. This is a visual explanation of the target, not a predicted gain or
-an additional RQF scoring term. The camera aims at the target point, not automatically
-at the object center. Camera, dots, rays and mesh heatmap can be toggled independently;
-hiding the heatmap restores the original mesh appearance while keeping RQF active.
-This changes only the presentation, not the metrics, proposals or their ordering.
+Gold marks the suggested camera. A cyan/blue circular patch follows the mesh
+around the selected surface target, and a line connects the camera to that target.
+The patch radius is a display choice, not a predicted improvement area. The camera
+aims at the selected point rather than automatically at the object center.
+Use **Show cyan/blue target highlight** below the surface-view buttons to hide the
+patch and target label. **Display settings** independently controls the line,
+camera marker, heatmap contrast and below-object proposals. **Photo texture**
+shows the textured cleaned surface while retaining the selected RQF target.
+These appearance controls do not change metrics, proposals or their ordering.
 **Preview camera** moves to its pose. **Next suggestion** examines
 the next eligible high-priority target; it does not claim that the previous target
 was improved. **Back to best** returns to the highest eligible priority.

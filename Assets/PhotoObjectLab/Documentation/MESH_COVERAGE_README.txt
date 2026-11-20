@@ -1,8 +1,12 @@
-BOTTLE MESH COVERAGE
+BOTTLE MESH COVERAGE EXPORT (DEVELOPER DIAGNOSTIC)
 
 Open Assets/PhotoObjectLab/BottleVisualization.unity and press Play.
-Click Mesh Coverage or press 5. Press 4 for the original mesh.
-Modes 1-3 remain the sparse point cloud views.
+The active viewer exposes coverage need through RQF filters + next-best-view.
+The separate BottleMeshCoverage export is retained for developer validation;
+there is no Mesh Coverage button in the current main viewer. Key 5 shows the
+cleaned dense cloud, key 4 selects the mesh, and keys 1-3 show sparse diagnostics.
+The palette described below belongs to this separate coverage-count export.
+RQF instead uses green for lower need and red for higher need.
 
 Colors show estimated numbers of visible registered cameras:
 red = low, yellow = middle, green = high. The on-screen legend gives
