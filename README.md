@@ -10,12 +10,11 @@ diagnostics and surface need indicators to an explainable next-best-view suggest
 2. Open `Assets/PhotoObjectLab/BottleVisualization.unity`.
 3. Press **Play**. Left-drag outside the panels to orbit and scroll to zoom.
 
-The bottle scene is the only enabled scene in Build Settings. The archived
-dinosaur scene is retained in the project but is not included in the scene list.
+The bottle scene is the only enabled scene in Build Settings.
 
 The supplied mesh and precomputed analysis data can be viewed without Python,
 COLMAP or OpenMVS installed. Original-photo previews require the corresponding
-image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/COLMAP_CAMERAS_README.txt).
+image files to be accessible; see [camera setup notes](Assets/PhotoObjectLab/Documentation/COLMAP_CAMERAS_README.txt).
 
 The active reconstruction uses uncropped OpenMVS depth maps at 988 × 741 pixels
 (`--resolution-level 2`). After background/table filtering it contains 398,813 dense
@@ -102,38 +101,22 @@ incremental reconstruction, physical camera guidance, VR or AR interaction.
 | `Assets/PhotoObjectLab/Editor/` | Mesh import and validation tools |
 | `Reconstruction/rqf_metrics.py` | Offline metric calculation and camera proposal export |
 | `Reconstruction/rqf_raycast.cpp` | Mesh visibility raycaster used by the Python pipeline |
-| `Reconstruction/` | Bottle preprocessing, export tools, tests and offline data |
-| `Assets/Archived/DinosaurDemo/` | Earlier dinosaur scene, scripts, data, photos and documentation |
+| `Reconstruction/` | Bottle preprocessing and export scripts; see [its README](Reconstruction/README.md) for the folder layout and test command |
 | `Packages/`, `ProjectSettings/` | Unity dependencies and project configuration |
 
 The main RQF implementation, generation command and required inputs are described
-in [RQF.md](RQF.md). [archived reconstruction guide](Assets/Archived/DinosaurDemo/Reconstruction/README.md) documents
-reproduction of the older dinosaur experiment, not the bottle reconstruction.
+in [RQF.md](RQF.md).
 
 ## Validation
 
 With the dependencies described in RQF.md installed, run the RQF checks from the project root:
 
 ```sh
-python3 -m unittest discover -s Reconstruction -p test_rqf_metrics.py -v
+python3 -m unittest discover -s Reconstruction/tests -t . -p 'test_*.py' -v
 ```
 
 In Unity, open the bottle scene and use **Tools > Bottle > Validate RQF**,
 **Validate Mesh Coverage** or **Validate COLMAP Cameras** for the corresponding checks.
-
-## Archived experiment and attribution
-
-The earlier dinosaur prototype is preserved at
-`Assets/Archived/DinosaurDemo/DinosaurPhotoDemo.unity` with its own
-[usage notes](Assets/Archived/DinosaurDemo/README.txt).
-It reconstructs a calibrated silhouette visual hull and demonstrates volume
-measurement. Those features and results belong to that experiment, not the bottle viewer.
-
-Its source photos and calibration come from the
-[Middlebury DinoRing dataset](https://vision.middlebury.edu/mview/data/), created by
-Steve Seitz, James Diebel, Daniel Scharstein, Brian Curless and Rick Szeliski.
-Original notes are preserved in `Assets/Archived/DinosaurDemo/Reconstruction/DATASET_README.txt`; dataset content
-retains its original terms.
 
 Unity caches, local builds and raw reconstruction inputs are excluded according
 to the repository's ignore rules. Some assets use Git LFS; if a model or image is

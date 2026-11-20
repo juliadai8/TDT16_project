@@ -19,7 +19,10 @@ from PIL import Image, ImageOps
 from scipy.ndimage import sobel, uniform_filter
 from scipy.spatial import cKDTree
 from scipy.special import expit
-from export_colmap_cameras import read_images, read_intrinsics
+if __package__:
+    from .export_colmap_cameras import read_images, read_intrinsics
+else:
+    from export_colmap_cameras import read_images, read_intrinsics
 
 # Names of the four need indicators and their combined RQF score.
 NAMES = ["coverage", "density", "edge", "texture", "rqf"]

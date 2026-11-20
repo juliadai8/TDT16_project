@@ -11,7 +11,6 @@ import struct
 
 import numpy as np
 from scipy.spatial import cKDTree
-import trimesh
 
 
 # Assign each mesh vertex the coverage of a nearby sample with a compatible surface normal.
@@ -50,6 +49,8 @@ def colorize(values, max_count):
 
 # Validate saved visibility samples against the mesh and export the coverage display data.
 def main():
+    import trimesh
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project", type=Path,
                         default=Path(__file__).resolve().parent.parent)

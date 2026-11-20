@@ -168,13 +168,14 @@ different reconstruction cannot silently be displayed on the current mesh.
 ## Validation
 
 ```sh
-python3 -m unittest discover -s Reconstruction -p test_rqf_metrics.py -v
+python3 -m unittest discover -s Reconstruction/tests -t . -p 'test_*.py' -v
 ```
 
-Tests use analytic normalization/combination values, synthetic foreground
-occlusion and a missed ray, surface snapping, topological boundaries on open
-and closed geometry, image gradients,
-pixel projection, PLY variable lists, and the actual binary/proposal export contract.
+These are manually run Python checks, not part of Unity's startup or an automated
+CI workflow. They cover RQF calculations, synthetic visibility and geometry,
+image measurements, camera parsing, coverage transfer, and the checked-in RQF
+export. Some checks need local reconstruction data and are skipped when it is
+not available. See [the reconstruction README](Reconstruction/README.md) for details.
 
 Unity editor check: **Tools > Bottle > Validate RQF**, or batch command
 `-executeMethod RqfValidation.BatchValidate`. It checks vertex alignment, heatmap

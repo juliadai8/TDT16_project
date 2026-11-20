@@ -126,6 +126,8 @@ __pycache__/
 
 # COLMAP generated files
 /Reconstruction/**/database.db
+/Reconstruction/**/database.db-shm
+/Reconstruction/**/database.db-wal
 /Reconstruction/**/project.ini
 /Reconstruction/**/*.bin
 
