@@ -17,8 +17,7 @@ comparison controls have been removed. Sparse-cloud diagnostics remain available
 
 The bottle scene is the only enabled build scene. Viewing the supplied geometry,
 texture and precomputed analysis does not require Python, COLMAP or OpenMVS.
-Source-photo previews require the original images locally. If an image or model
-is a Git LFS pointer after cloning, install Git LFS and run `git lfs pull`.
+Source-photo previews require the original images locally.
 
 ## Current reconstruction
 
